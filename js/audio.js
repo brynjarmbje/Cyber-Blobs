@@ -1,118 +1,218 @@
 // @ts-nocheck
 
+// Backwards-compatible wrapper (single track).
 export function initMusic(ui, opts = {}) {
-  const src = opts.src || './CyberBlob-Theme_V1.mp3';
+  const system = initMusicSystem(ui, {
+    storageKey: opts.storageKey,
+    volumeGame: opts.volume,
+    gameSrc: opts.src,
+    // No menu track by default.
+    menuSrc: null,
+    stingers: [],
+  });
+
+  // Preserve the old API surface.
+  return {
+    audio: system._debug?.gameAudio,
+    isEnabled: system.isEnabled,
+    isActive: () => system.getContext() !== 'off',
+    toggle: system.toggle,
+    play: system.play,
+    pause: system.pause,
+    setEnabled: system.setEnabled,
+    setActive: (active) => system.setContext(active ? 'game' : 'off'),
+  };
+}
+
+// Dual-track music system:
+// - Plays gameplay music when context === 'game'
+// - Plays menu music when context === 'menu'
+// - Stops all when context === 'off'
+// Also supports random "stingers" fired exactly when a loop restarts.
+export function initMusicSystem(ui, opts = {}) {
   const storageKey = opts.storageKey || 'cyberblobs_music_enabled_v1';
   const initialEnabled = readBool(storageKey, true);
-  const initialActive = typeof opts.active === 'boolean' ? opts.active : true;
 
-  const audio = new Audio(src);
-  audio.loop = true;
-  audio.preload = 'auto';
-  audio.volume = clampNumber(opts.volume ?? 0.35, 0, 1);
+  const gameSrc = opts.gameSrc || './CyberBlob-Theme_V1.mp3';
+  const menuSrc = typeof opts.menuSrc === 'string' ? opts.menuSrc : './CyberBlob-Menu-Theme.mp3';
+  const stingers = Array.isArray(opts.stingers)
+    ? opts.stingers
+    : ['./CyberBlob-drum1.mp3', './CyberBlob-whine1.mp3'];
+
+  const volumeGame = clampNumber(opts.volumeGame ?? 0.35, 0, 1);
+  const volumeMenu = clampNumber(opts.volumeMenu ?? 0.30, 0, 1);
+  const stingerVolume = clampNumber(opts.stingerVolume ?? 0.55, 0, 1);
 
   let enabled = initialEnabled;
-  let active = initialActive;
+  let context = opts.context === 'menu' || opts.context === 'off' ? opts.context : 'game';
   let unlocked = false;
-  let wasPlayingBeforeHide = false;
 
-  const setButtonState = () => {
+  const game = createTrack(gameSrc, volumeGame);
+  const menu = menuSrc ? createTrack(menuSrc, volumeMenu) : null;
+
+  let wasPlayingBeforeHide = false;
+  let hiddenContext = context;
+  let hiddenTrack = null;
+
+  function activeTrack() {
+    if (context === 'game') return game;
+    if (context === 'menu') return menu || game;
+    return null;
+  }
+
+  function setButtonState() {
     const btn = ui?.musicBtn;
     if (!btn) return;
     btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
     btn.classList.toggle('isMuted', !enabled);
     btn.textContent = enabled ? 'MUSIC ON' : 'MUSIC OFF';
     btn.title = enabled ? 'Music enabled (tap to mute)' : 'Music muted (tap to enable)';
-  };
+  }
 
-  const tryPlay = async () => {
-    if (!enabled || !active) return false;
+  function pauseAll() {
+    game.pause();
+    if (menu) menu.pause();
+  }
+
+  function pickRandom(arr) {
+    if (!arr || arr.length === 0) return null;
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function playStinger() {
+    if (!enabled || !unlocked) return;
+    const src = pickRandom(stingers);
+    if (!src) return;
+
+    const a = new Audio(src);
+    a.loop = false;
+    a.preload = 'auto';
+    a.volume = stingerVolume;
+    // Fire and forget.
+    void a.play().catch(() => {});
+  }
+
+  async function ensurePlaying(track, { restart = false } = {}) {
+    if (!enabled || context === 'off' || !track) return false;
+
+    // Stop the other track so we never overlap.
+    if (track !== game) game.pause();
+    if (menu && track !== menu) menu.pause();
+
+    if (restart) {
+      try {
+        track.audio.currentTime = 0;
+      } catch {
+        // ignore
+      }
+    }
+
+    // If starting from the beginning (fresh start or loop restart), fire a stinger.
+    const isAtStart = (track.audio.currentTime || 0) < 0.08;
+    if (isAtStart) playStinger();
+
     try {
-      await audio.play();
+      await track.audio.play();
       unlocked = true;
+      track.hasStarted = true;
       return true;
     } catch {
       return false;
     }
-  };
+  }
 
-  const pause = () => {
-    try {
-      audio.pause();
-    } catch {
-      // ignore
-    }
-  };
-
-  const onFirstGesture = async () => {
-    if (!enabled || !active) return;
-    await tryPlay();
-    if (unlocked) removeGestureListeners();
-  };
-
-  const gestureTargets = [
-    ui?.gameShell,
-    ui?.canvas,
-    document,
-  ].filter(Boolean);
-
-  const addGestureListeners = () => {
-    for (const t of gestureTargets) {
+  function addGestureListeners() {
+    for (const t of gestureTargets(ui)) {
       t.addEventListener('pointerdown', onFirstGesture, { passive: true });
       t.addEventListener('touchstart', onFirstGesture, { passive: true });
       t.addEventListener('keydown', onFirstGesture, { passive: true });
     }
-  };
+  }
 
-  const removeGestureListeners = () => {
-    for (const t of gestureTargets) {
+  function removeGestureListeners() {
+    for (const t of gestureTargets(ui)) {
       t.removeEventListener('pointerdown', onFirstGesture);
       t.removeEventListener('touchstart', onFirstGesture);
       t.removeEventListener('keydown', onFirstGesture);
     }
-  };
+  }
 
-  const setEnabled = (nextEnabled) => {
+  async function onFirstGesture() {
+    if (!enabled || context === 'off') return;
+    const t = activeTrack();
+    const ok = await ensurePlaying(t, { restart: !t?.hasStarted });
+    if (ok) removeGestureListeners();
+  }
+
+  function setEnabled(nextEnabled) {
     enabled = !!nextEnabled;
     writeBool(storageKey, enabled);
     setButtonState();
 
     if (!enabled) {
-      pause();
+      pauseAll();
       return;
     }
 
-    // If already unlocked, we can usually resume immediately.
-    // Otherwise wait for the next gesture.
-    if (unlocked) {
-      void tryPlay();
-    } else {
-      addGestureListeners();
-    }
-  };
+    // Try immediately if already unlocked; otherwise wait for gesture.
+    const t = activeTrack();
+    if (unlocked) void ensurePlaying(t, { restart: !t?.hasStarted });
+    else addGestureListeners();
+  }
 
-  const setActive = (nextActive) => {
-    active = !!nextActive;
-    if (!active) {
-      pause();
+  function toggle() {
+    setEnabled(!enabled);
+  }
+
+  function setContext(nextContext) {
+    const next = nextContext === 'menu' || nextContext === 'off' ? nextContext : 'game';
+    if (context === next) return;
+    context = next;
+
+    if (context === 'off' || !enabled) {
+      pauseAll();
       return;
     }
 
-    if (enabled) {
-      if (unlocked) void tryPlay();
-      else addGestureListeners();
-    }
-  };
+    const t = activeTrack();
+    if (unlocked) void ensurePlaying(t, { restart: !t?.hasStarted });
+    else addGestureListeners();
+  }
 
-  const toggle = () => setEnabled(!enabled);
+  function getContext() {
+    return context;
+  }
+
+  function play() {
+    const t = activeTrack();
+    return ensurePlaying(t, { restart: !t?.hasStarted });
+  }
+
+  function pause() {
+    pauseAll();
+  }
+
+  // Hook up looping + stinger on loop restarts.
+  game.audio.addEventListener('ended', () => {
+    if (!enabled || context !== 'game') return;
+    // Restart from beginning; stinger fires at restart.
+    void ensurePlaying(game, { restart: true });
+  });
+  if (menu) {
+    menu.audio.addEventListener('ended', () => {
+      if (!enabled || context !== 'menu') return;
+      void ensurePlaying(menu, { restart: true });
+    });
+  }
 
   if (ui?.musicBtn) {
     ui.musicBtn.addEventListener('click', async () => {
-      // Clicking counts as a gesture, so it can unlock audio.
+      // Click counts as a gesture and can unlock audio.
       if (!enabled) {
         setEnabled(true);
-        await tryPlay();
-        if (unlocked) removeGestureListeners();
+        const t = activeTrack();
+        const ok = await ensurePlaying(t, { restart: !t?.hasStarted });
+        if (ok) removeGestureListeners();
         return;
       }
       setEnabled(false);
@@ -120,34 +220,67 @@ export function initMusic(ui, opts = {}) {
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (!enabled || !active) return;
+    if (!enabled || context === 'off') return;
 
     if (document.hidden) {
-      wasPlayingBeforeHide = !audio.paused;
-      pause();
+      hiddenContext = context;
+      hiddenTrack = activeTrack();
+      wasPlayingBeforeHide = !!hiddenTrack && !hiddenTrack.audio.paused;
+      pauseAll();
       return;
     }
 
+    // Resume same context without forcing a restart.
     if (wasPlayingBeforeHide) {
-      // Attempt resume; if blocked (rare after unlock), gesture will handle it.
-      void tryPlay();
+      const t = (hiddenContext === 'game' ? game : (menu || game));
+      if (unlocked) void ensurePlaying(t, { restart: false });
+      else addGestureListeners();
     }
   });
 
   // Prime.
   setButtonState();
-  if (enabled && active) addGestureListeners();
+  // Preload so the first play after gesture is fast.
+  void game.audio.load?.();
+  void menu?.audio.load?.();
+  if (enabled && !unlocked && context !== 'off') addGestureListeners();
 
   return {
-    audio,
     isEnabled: () => enabled,
-    isActive: () => active,
     toggle,
-    play: tryPlay,
-    pause,
     setEnabled,
-    setActive,
+    setContext,
+    getContext,
+    play,
+    pause,
+    // For debugging/back-compat only.
+    _debug: {
+      gameAudio: game.audio,
+      menuAudio: menu?.audio || null,
+    },
   };
+}
+
+function createTrack(src, volume) {
+  const audio = new Audio(src);
+  audio.loop = false;
+  audio.preload = 'auto';
+  audio.volume = clampNumber(volume, 0, 1);
+  return {
+    audio,
+    hasStarted: false,
+    pause: () => {
+      try {
+        audio.pause();
+      } catch {
+        // ignore
+      }
+    },
+  };
+}
+
+function gestureTargets(ui) {
+  return [ui?.musicBtn, ui?.gameShell, ui?.canvas, document].filter(Boolean);
 }
 
 function readBool(key, fallback) {

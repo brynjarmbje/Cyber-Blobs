@@ -1,7 +1,7 @@
 import { getUiElements } from './ui.js';
 import { createGame } from './game.js';
 import { registerServiceWorker } from './pwa.js';
-import { initMusic } from './audio.js';
+import { initMusicSystem } from './audio.js';
 
 const ui = getUiElements();
 if (!ui.canvas) {
@@ -10,14 +10,21 @@ if (!ui.canvas) {
 
 registerServiceWorker();
 
-// Theme music (requires a user gesture on mobile). The controller will
-// auto-start on the first tap/click if enabled.
-const music = initMusic(ui, { src: './CyberBlob-Theme_V1.mp3', volume: 0.35, active: false });
+// Music system (requires a user gesture on mobile).
+// Plays gameplay music while playing; otherwise plays menu music.
+const music = initMusicSystem(ui, {
+  gameSrc: './CyberBlob-Theme_V1.mp3',
+  menuSrc: './CyberBlob-Menu-Theme.mp3',
+  stingers: ['./CyberBlob-drum1.mp3', './CyberBlob-whine1.mp3'],
+  volumeGame: 0.35,
+  volumeMenu: 0.30,
+  stingerVolume: 0.55,
+  context: 'game',
+});
 
-// Only play music while actively playing (paused/gameover => stop).
 window.addEventListener('cyberblobs:playstate', (e) => {
   const state = e?.detail?.state;
-  music.setActive(state === 'playing');
+  music.setContext(state === 'playing' ? 'game' : 'menu');
 });
 
 createGame(ui).start();
