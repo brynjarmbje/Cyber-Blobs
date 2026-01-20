@@ -195,6 +195,51 @@ export function createGame(ui) {
   // Animation loop guard (prevents double RAF loops; allows restart after Game Over)
   let loopRunning = false;
   let lastUpdateMs = 0;
+  let paused = false;
+
+  function emitPlayState(state) {
+    // state: 'playing' | 'paused' | 'gameover'
+    window.dispatchEvent(
+      new CustomEvent('cyberblobs:playstate', {
+        detail: { state },
+      })
+    );
+  }
+
+  function syncPauseUi() {
+    if (ui?.pauseOverlay) ui.pauseOverlay.classList.toggle('visible', paused);
+    if (ui?.pauseBtn) {
+      ui.pauseBtn.classList.toggle('isActive', paused);
+      ui.pauseBtn.setAttribute('aria-pressed', paused ? 'true' : 'false');
+      ui.pauseBtn.textContent = paused ? 'RESUME' : 'PAUSE';
+      ui.pauseBtn.title = paused ? 'Resume (P / ESC)' : 'Pause (P / ESC)';
+    }
+  }
+
+  function pauseGame() {
+    if (gameOver) return;
+    if (paused) return;
+    paused = true;
+    loopRunning = false;
+    syncPauseUi();
+    emitPlayState('paused');
+  }
+
+  function resumeGame() {
+    if (gameOver) return;
+    if (!paused) return;
+    paused = false;
+    syncPauseUi();
+    // Reset dt accumulator so we don't jump on resume.
+    lastUpdateMs = performance.now();
+    emitPlayState('playing');
+    requestLoop();
+  }
+
+  function togglePause() {
+    if (paused) resumeGame();
+    else pauseGame();
+  }
 
   function clamp(v, min, max) {
     return v < min ? min : v > max ? max : v;
@@ -853,6 +898,9 @@ export function createGame(ui) {
   function triggerGameOver() {
     gameOver = true;
     loopRunning = false;
+    paused = false;
+    syncPauseUi();
+    emitPlayState('gameover');
 
     const timeSeconds = (performance.now() - startTimeMs) / 1000;
     const cashEarned = Math.max(0, cash - runStartCash);
@@ -881,6 +929,9 @@ export function createGame(ui) {
   function resetRun() {
     gameOver = false;
     hideGameOver(ui);
+
+    paused = false;
+    syncPauseUi();
 
     // If you died while a modal was open, reset should always get you back to gameplay.
     closeModal(ui.shopModal);
@@ -914,6 +965,8 @@ export function createGame(ui) {
     spawnEnemiesForLevel();
     showCenterMessage(ui.levelUpMessage, `LEVEL ${level}`, 850);
     updateHud(ui, buildHudState());
+
+    emitPlayState('playing');
 
     // Ensure the loop resumes after Game Over.
     requestLoop();
@@ -984,7 +1037,10 @@ export function createGame(ui) {
   }
 
   function update() {
-    if (gameOver) return;
+    if (gameOver || paused) {
+      loopRunning = false;
+      return;
+    }
 
     const nowMs = performance.now();
     // Normalize all per-tick movement to a 60fps baseline.
@@ -1343,6 +1399,12 @@ export function createGame(ui) {
     };
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'p' || e.key === 'P' || e.code === 'Escape') {
+        if (shouldIgnoreHotkeys()) return;
+        e.preventDefault();
+        if (!e.repeat) togglePause();
+        return;
+      }
       if (e.code === 'Space') {
         if (shouldIgnoreHotkeys()) return;
         e.preventDefault();
@@ -1377,6 +1439,8 @@ export function createGame(ui) {
     });
 
     ui.tryAgainBtn?.addEventListener('click', resetRun);
+
+    ui.pauseBtn?.addEventListener('click', togglePause);
 
     ui.openShopBtn?.addEventListener('click', openShop);
     ui.openBoardBtn?.addEventListener('click', openBoard);

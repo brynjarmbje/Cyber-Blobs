@@ -36,6 +36,7 @@
       <button id="openShopBtn" class="miniBtn" type="button">SHOP</button>
       <button id="openBoardBtn" class="miniBtn" type="button">SCORES</button>
       <button id="musicBtn" class="miniBtn miniBtn--music" type="button" aria-pressed="true">MUSIC ON</button>
+      <button id="pauseBtn" class="miniBtn miniBtn--pause" type="button" aria-pressed="false">PAUSE</button>
     </div>
   </header>
 
@@ -43,6 +44,8 @@
     <div id="gameShell">
       <canvas id="glCanvas" width="800" height="600" aria-hidden="true"></canvas>
       <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+      <div id="pauseOverlay" aria-hidden="true">PAUSED</div>
 
       <div id="livesOverlay" aria-label="Lives"><span id="livesContainer"></span></div>
 
@@ -65,7 +68,7 @@
         <span class="hintDot">•</span>
         <span class="hintGroup">Turn <kbd>Z</kbd> / <kbd>X</kbd></span>
         <span class="hintDot">•</span>
-        <span class="hintGroup">Laser <kbd>SPACE</kbd> • Nuke <kbd>SHIFT</kbd></span>
+        <span class="hintGroup">Laser <kbd>SPACE</kbd> • Nuke <kbd>SHIFT</kbd> • Pause <kbd>P</kbd>/<kbd>ESC</kbd></span>
       </div>
     </div>
 

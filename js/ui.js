@@ -36,6 +36,7 @@ export function getUiElements() {
     openShopBtn: document.getElementById('openShopBtn'),
     openBoardBtn: document.getElementById('openBoardBtn'),
     musicBtn: document.getElementById('musicBtn'),
+    pauseBtn: document.getElementById('pauseBtn'),
 
     shopModal: document.getElementById('shopModal'),
     closeShopBtn: document.getElementById('closeShopBtn'),
@@ -55,6 +56,7 @@ export function getUiElements() {
     levelUpMessage: document.getElementById('levelUpMessage'),
     centerToast: document.getElementById('centerToast'),
     flashOverlay: document.getElementById('flashOverlay'),
+    pauseOverlay: document.getElementById('pauseOverlay'),
 
     // Controls
     desktopControlsHint: document.getElementById('desktopControlsHint'),

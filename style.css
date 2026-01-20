@@ -75,6 +75,8 @@ html, body {
   .miniBtn:active { transform: translateY(1px); }
 
   .miniBtn--music { background: linear-gradient(135deg, #b5ff, #2cf); }
+  .miniBtn--pause { background: rgba(255,255,255,0.10); color: rgba(234,255,255,0.9); border: 1px solid rgba(255,255,255,0.18); box-shadow: none; }
+  .miniBtn--pause.isActive { background: rgba(0,255,255,0.14); border-color: rgba(0,255,255,0.30); }
   .miniBtn.isMuted {
     background: rgba(255,255,255,0.10);
     color: rgba(234,255,255,0.85);
@@ -109,6 +111,25 @@ html, body {
       height: min(78vh, calc(100vh - 120px));
       aspect-ratio: 4 / 3;
     }
+
+    #pauseOverlay {
+      position: absolute;
+      inset: 0;
+      display: none;
+      place-items: center;
+      z-index: 45;
+      pointer-events: none;
+      user-select: none;
+      font-size: clamp(28px, 6vw, 56px);
+      font-weight: 950;
+      letter-spacing: 1.6px;
+      color: rgba(234,255,255,0.95);
+      text-shadow: 0 0 16px rgba(0,255,255,0.45), 0 0 34px rgba(0,255,255,0.22), 0 0 10px rgba(0,0,0,0.75);
+      background: radial-gradient(circle at 50% 50%, rgba(0,0,0,0.35), rgba(0,0,0,0.05) 55%, rgba(0,0,0,0));
+      border-radius: 20px;
+    }
+
+    #pauseOverlay.visible { display: grid; }
 
     /* Lives (top-left) */
     #livesOverlay {

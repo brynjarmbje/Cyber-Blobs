@@ -2,7 +2,7 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v2';
+const CACHE_NAME = 'leikur-cache-v3';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [

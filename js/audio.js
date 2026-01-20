@@ -4,6 +4,7 @@ export function initMusic(ui, opts = {}) {
   const src = opts.src || './CyberBlob-Theme_V1.mp3';
   const storageKey = opts.storageKey || 'cyberblobs_music_enabled_v1';
   const initialEnabled = readBool(storageKey, true);
+  const initialActive = typeof opts.active === 'boolean' ? opts.active : true;
 
   const audio = new Audio(src);
   audio.loop = true;
@@ -11,6 +12,7 @@ export function initMusic(ui, opts = {}) {
   audio.volume = clampNumber(opts.volume ?? 0.35, 0, 1);
 
   let enabled = initialEnabled;
+  let active = initialActive;
   let unlocked = false;
   let wasPlayingBeforeHide = false;
 
@@ -24,7 +26,7 @@ export function initMusic(ui, opts = {}) {
   };
 
   const tryPlay = async () => {
-    if (!enabled) return false;
+    if (!enabled || !active) return false;
     try {
       await audio.play();
       unlocked = true;
@@ -43,7 +45,7 @@ export function initMusic(ui, opts = {}) {
   };
 
   const onFirstGesture = async () => {
-    if (!enabled) return;
+    if (!enabled || !active) return;
     await tryPlay();
     if (unlocked) removeGestureListeners();
   };
@@ -89,6 +91,19 @@ export function initMusic(ui, opts = {}) {
     }
   };
 
+  const setActive = (nextActive) => {
+    active = !!nextActive;
+    if (!active) {
+      pause();
+      return;
+    }
+
+    if (enabled) {
+      if (unlocked) void tryPlay();
+      else addGestureListeners();
+    }
+  };
+
   const toggle = () => setEnabled(!enabled);
 
   if (ui?.musicBtn) {
@@ -105,7 +120,7 @@ export function initMusic(ui, opts = {}) {
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (!enabled) return;
+    if (!enabled || !active) return;
 
     if (document.hidden) {
       wasPlayingBeforeHide = !audio.paused;
@@ -121,15 +136,17 @@ export function initMusic(ui, opts = {}) {
 
   // Prime.
   setButtonState();
-  if (enabled) addGestureListeners();
+  if (enabled && active) addGestureListeners();
 
   return {
     audio,
     isEnabled: () => enabled,
+    isActive: () => active,
     toggle,
     play: tryPlay,
     pause,
     setEnabled,
+    setActive,
   };
 }
 
