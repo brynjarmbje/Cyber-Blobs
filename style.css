@@ -460,11 +460,47 @@ html, body {
       color: rgba(255,255,255,0.9);
       font-size: 11px;
       backdrop-filter: blur(10px);
-      pointer-events:none;
+      pointer-events:auto;
       user-select:none;
       flex-wrap: nowrap;
       white-space: nowrap;
     }
+
+    #desktopControlsHint .hintToggle {
+      pointer-events: auto;
+      user-select: none;
+      appearance: none;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: rgba(255,255,255,0.08);
+      color: rgba(234,255,255,0.92);
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      margin-left: 6px;
+      box-shadow: 0 10px 18px rgba(0,0,0,0.18);
+    }
+    #desktopControlsHint .hintToggle[aria-pressed="true"] {
+      border-color: rgba(0,255,255,0.32);
+      background: rgba(0,255,255,0.12);
+      box-shadow: 0 12px 22px rgba(0,0,0,0.22), 0 0 18px rgba(0,255,255,0.12);
+    }
+    #desktopControlsHint .hintToggle:active { transform: translateY(1px); }
+
+    #desktopControlsHint .hintSep { opacity: 0.55; padding: 0 4px; }
+
+    #desktopControlsHint .ultState { font-weight: 950; letter-spacing: 0.4px; }
+    #desktopControlsHint .ultState--ready {
+      color: rgba(160, 255, 255, 0.95);
+      text-shadow: 0 0 10px rgba(0,255,255,0.25);
+    }
+    #desktopControlsHint .ultState--cooldown { color: rgba(255,255,255,0.85); }
+    #desktopControlsHint .ultState--active {
+      color: rgba(255, 235, 200, 0.95);
+      text-shadow: 0 0 10px rgba(255, 160, 0, 0.18);
+    }
+    #desktopControlsHint .ultState--off { opacity: 0.8; }
 
     #desktopControlsHint .hintGroup { white-space: nowrap; }
     #desktopControlsHint kbd {
@@ -623,6 +659,8 @@ html, body {
     align-self:center;
     height: 56px;
     min-width: 70px;
+    position: relative;
+    overflow: hidden;
     border-radius: 18px;
     border: 1px solid rgba(255,255,255,0.16);
     background: rgba(0,0,0,0.55);
@@ -649,6 +687,94 @@ html, body {
     letter-spacing: 1.2px;
   }
   .ultBtn:active { transform: scale(0.98); }
+
+  @keyframes ultReadyPulse {
+    0%, 100% { box-shadow: 0 18px 36px rgba(0,0,0,0.35), 0 0 0 rgba(0,255,255,0.0); filter: brightness(1); }
+    50% { box-shadow: 0 20px 42px rgba(0,0,0,0.42), 0 0 24px rgba(0,255,255,0.22); filter: brightness(1.08); }
+  }
+
+  /* READY state = off cooldown */
+  .ultBtn.isReady {
+    border-color: rgba(0,255,255,0.55);
+    background: linear-gradient(180deg, rgba(0,255,255,0.18), rgba(0,0,0,0.55));
+    animation: ultReadyPulse 850ms ease-in-out infinite;
+  }
+  .ultBtn.isReady .ultKey { opacity: 1; }
+
+  @keyframes ultActivePulse {
+    0%, 100% { filter: brightness(1.05) saturate(1.05); }
+    50% { filter: brightness(1.18) saturate(1.15); }
+  }
+
+  .ultBtn.isActive {
+    border-color: rgba(160, 255, 255, 0.70);
+    background: linear-gradient(180deg, rgba(0,255,255,0.22), rgba(0,0,0,0.58));
+    box-shadow:
+      0 18px 36px rgba(0,0,0,0.35),
+      0 0 28px rgba(0,255,255,0.22);
+    animation: ultActivePulse 700ms ease-in-out infinite;
+  }
+  .ultBtn.isActive::after {
+    content: '';
+    position: absolute;
+    inset: -40% -30%;
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.18), rgba(0,255,255,0.12) 35%, rgba(0,0,0,0) 60%),
+      radial-gradient(circle at 70% 65%, rgba(0,255,255,0.10), rgba(0,0,0,0) 55%);
+    transform: rotate(12deg);
+    pointer-events: none;
+    opacity: 0.9;
+    mix-blend-mode: screen;
+  }
+
+  .ultBtn--nuke.isActive {
+    border-color: rgba(255, 210, 80, 0.72);
+    background: linear-gradient(180deg, rgba(255, 120, 0, 0.26), rgba(0,0,0,0.60));
+    box-shadow:
+      0 18px 36px rgba(0,0,0,0.35),
+      0 0 30px rgba(255, 150, 0, 0.24);
+    animation: ultActivePulse 750ms ease-in-out infinite;
+  }
+  .ultBtn--nuke.isActive::after {
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.16), rgba(255, 180, 0, 0.14) 35%, rgba(0,0,0,0) 62%),
+      radial-gradient(circle at 70% 65%, rgba(255, 120, 0, 0.12), rgba(0,0,0,0) 56%);
+  }
+
+  .ultBtn--nuke.isReady {
+    border-color: rgba(255, 200, 0, 0.55);
+    background: linear-gradient(180deg, rgba(255, 120, 0, 0.18), rgba(0,0,0,0.55));
+    animation: none;
+    box-shadow: 0 18px 36px rgba(0,0,0,0.35), 0 0 22px rgba(255, 160, 0, 0.20);
+  }
+
+  /* Desktop ult buttons (if ever shown) */
+  #laserTopBtn.isReady {
+    border-color: rgba(0,255,255,0.55);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.30), 0 0 20px rgba(0,255,255,0.16);
+    background: linear-gradient(180deg, rgba(0,255,255,0.14), rgba(0,0,0,0.35));
+  }
+  #nukeTopBtn.isReady {
+    border-color: rgba(255, 200, 0, 0.55);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.30), 0 0 20px rgba(255, 160, 0, 0.16);
+    background: linear-gradient(180deg, rgba(255, 120, 0, 0.14), rgba(0,0,0,0.35));
+  }
+
+  #laserTopBtn.isActive,
+  #nukeTopBtn.isActive {
+    position: relative;
+    overflow: hidden;
+  }
+  #laserTopBtn.isActive {
+    border-color: rgba(160, 255, 255, 0.70);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.30), 0 0 24px rgba(0,255,255,0.22);
+    background: linear-gradient(180deg, rgba(0,255,255,0.20), rgba(0,0,0,0.36));
+  }
+  #nukeTopBtn.isActive {
+    border-color: rgba(255, 210, 80, 0.72);
+    box-shadow: 0 14px 30px rgba(0,0,0,0.30), 0 0 24px rgba(255, 150, 0, 0.22);
+    background: linear-gradient(180deg, rgba(255, 120, 0, 0.22), rgba(0,0,0,0.36));
+  }
   .joystick {
     width: var(--joySize);
     height: var(--joySize);

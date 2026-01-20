@@ -39,7 +39,6 @@
           <button id="openShopBtn" class="menuItem" type="button" role="menuitem">Shop</button>
           <button id="openBoardBtn" class="menuItem" type="button" role="menuitem">Scores</button>
           <button id="musicBtn" class="menuItem" type="button" role="menuitem" aria-pressed="true">MUSIC ON</button>
-          <button id="mouseAimBtn" class="menuItem menuItem--desktop" type="button" role="menuitem" aria-pressed="true">Mouse Aim: ON</button>
         </div>
       </details>
       <button id="pauseBtn" class="iconBtn iconBtn--pause" type="button" aria-pressed="false" aria-label="Pause" title="Pause"></button>
@@ -69,12 +68,14 @@
       <div id="levelUpMessage">LEVEL UP!</div>
       <div id="flashOverlay"></div>
 
-      <div id="desktopControlsHint" aria-hidden="true">
+      <div id="desktopControlsHint">
         <span class="hintGroup">Move <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
         <span class="hintDot">•</span>
-        <span class="hintGroup">Turn <kbd>Z</kbd> / <kbd>X</kbd></span>
+        <span class="hintGroup">Aim <button id="aimModeBtn" class="hintToggle" type="button" aria-pressed="false" title="Toggle mouse aim">Z/X</button></span>
         <span class="hintDot">•</span>
-        <span class="hintGroup">Laser <kbd>SPACE</kbd> • Nuke <kbd>SHIFT</kbd> • Pause <kbd>P</kbd>/<kbd>ESC</kbd></span>
+        <span id="desktopUltStatus" class="hintGroup hintGroup--ultStatus" aria-hidden="true"></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Pause <kbd>P</kbd>/<kbd>ESC</kbd></span>
       </div>
     </div>
 

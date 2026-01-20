@@ -518,7 +518,7 @@ export function createGame(ui) {
   function getLaserButtonText(nowMs) {
     const showKeyHint = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
     if (!ult.laser.owned) return 'LASER';
-    if (ult.laser.active) return showKeyHint ? 'LASER ACTIVE\nSPACE' : 'LASER ACTIVE';
+    if (ult.laser.active) return showKeyHint ? 'LASER\nSPACE' : 'LASER';
     const cd = getCooldownText(nowMs, ult.laser.cooldownMs, ult.laser.lastUsedMs);
     if (!showKeyHint) return cd ? `LASER ${cd}` : 'LASER';
     return cd ? `LASER ${cd}\nSPACE` : 'LASER\nSPACE';
@@ -527,7 +527,7 @@ export function createGame(ui) {
   function getNukeButtonText(nowMs) {
     const showKeyHint = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
     if (!ult.nuke.owned) return 'NUKE';
-    if (ult.nuke.active) return showKeyHint ? 'NUKE ACTIVE\nSHIFT' : 'NUKE ACTIVE';
+    if (ult.nuke.active) return showKeyHint ? 'NUKE\nSHIFT' : 'NUKE';
     const cd = getCooldownText(nowMs, ult.nuke.cooldownMs, ult.nuke.lastUsedMs);
     if (!showKeyHint) return cd ? `NUKE ${cd}` : 'NUKE';
     return cd ? `NUKE ${cd}\nSHIFT` : 'NUKE\nSHIFT';
@@ -1244,6 +1244,27 @@ export function createGame(ui) {
     const elapsedSeconds = (performance.now() - startTimeMs) / 1000;
     const next = levelColors[levelNextColorIndex];
     const nowMs = performance.now();
+
+    const laserReady =
+      !!ult?.laser?.owned &&
+      !ult.laser.active &&
+      nowMs - (ult.laser.lastUsedMs || 0) >= (ult.laser.cooldownMs || 0);
+    const nukeReady =
+      !!ult?.nuke?.owned &&
+      !ult.nuke.active &&
+      nowMs - (ult.nuke.lastUsedMs || 0) >= (ult.nuke.cooldownMs || 0);
+
+    const laserOwned = !!ult?.laser?.owned;
+    const nukeOwned = !!ult?.nuke?.owned;
+    const laserRemainingMs = laserOwned
+      ? Math.max(0, (ult.laser.cooldownMs || 0) - (nowMs - (ult.laser.lastUsedMs || 0)))
+      : 0;
+    const nukeRemainingMs = nukeOwned
+      ? Math.max(0, (ult.nuke.cooldownMs || 0) - (nowMs - (ult.nuke.lastUsedMs || 0)))
+      : 0;
+    const laserCooldownSeconds = laserOwned && !ult.laser.active && laserRemainingMs > 0 ? Math.ceil(laserRemainingMs / 1000) : 0;
+    const nukeCooldownSeconds = nukeOwned && !ult.nuke.active && nukeRemainingMs > 0 ? Math.ceil(nukeRemainingMs / 1000) : 0;
+
     return {
       level,
       elapsedSeconds,
@@ -1254,6 +1275,15 @@ export function createGame(ui) {
       nowMs,
       laserText: getLaserButtonText(nowMs),
       nukeText: getNukeButtonText(nowMs),
+      laserReady,
+      nukeReady,
+      laserActive: !!ult?.laser?.active,
+      nukeActive: !!ult?.nuke?.active,
+      laserOwned,
+      nukeOwned,
+      laserCooldownSeconds,
+      nukeCooldownSeconds,
+      mouseAimEnabled,
     };
   }
 
@@ -1757,19 +1787,21 @@ export function createGame(ui) {
     ui.ultLaserBtn?.addEventListener('click', () => buyUltimate('laser'));
     ui.ultNukeBtn?.addEventListener('click', () => buyUltimate('nuke'));
 
-    const syncMouseAimUi = () => {
-      if (!ui.mouseAimBtn) return;
-      ui.mouseAimBtn.textContent = `Mouse Aim: ${mouseAimEnabled ? 'ON' : 'OFF'}`;
-      ui.mouseAimBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
-      ui.mouseAimBtn.classList.toggle('isMuted', !mouseAimEnabled);
+    const syncAimModeUi = () => {
+      if (!ui.aimModeBtn) return;
+      ui.aimModeBtn.textContent = mouseAimEnabled ? 'MOUSE' : 'Z/X';
+      ui.aimModeBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
+      ui.aimModeBtn.title = mouseAimEnabled ? 'Mouse aim enabled (click to use Z/X)' : 'Z/X aim enabled (click to use mouse)';
     };
 
-    syncMouseAimUi();
+    syncAimModeUi();
 
-    ui.mouseAimBtn?.addEventListener('click', () => {
+    ui.aimModeBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
       mouseAimEnabled = !mouseAimEnabled;
       saveMouseAimEnabled(mouseAimEnabled);
-      syncMouseAimUi();
+      syncAimModeUi();
     });
 
     const updateMouseAimFromEvent = (e) => {

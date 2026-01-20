@@ -38,7 +38,7 @@ export function getUiElements() {
     openBoardBtn: document.getElementById('openBoardBtn'),
     musicBtn: document.getElementById('musicBtn'),
     pauseBtn: document.getElementById('pauseBtn'),
-    mouseAimBtn: document.getElementById('mouseAimBtn'),
+    aimModeBtn: document.getElementById('aimModeBtn'),
 
     shopModal: document.getElementById('shopModal'),
     closeShopBtn: document.getElementById('closeShopBtn'),
@@ -62,6 +62,7 @@ export function getUiElements() {
 
     // Controls
     desktopControlsHint: document.getElementById('desktopControlsHint'),
+    desktopUltStatus: document.getElementById('desktopUltStatus'),
     touchControls: document.getElementById('touchControls'),
     moveStick: document.getElementById('moveStick'),
     moveKnob: document.getElementById('moveKnob'),
@@ -100,6 +101,15 @@ export function updateHud(ui, state) {
     laserText,
     nukeText,
     nowMs,
+    laserReady,
+    nukeReady,
+    laserActive,
+    nukeActive,
+    laserOwned,
+    nukeOwned,
+    laserCooldownSeconds,
+    nukeCooldownSeconds,
+    mouseAimEnabled,
   } = state;
 
   if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(level);
@@ -135,6 +145,75 @@ export function updateHud(ui, state) {
     setUltButtonLabel(ui.nukeBtn, nukeText);
     setUltButtonLabel(ui.nukeTopBtn, nukeText);
   }
+
+  // Make ult buttons visually obvious when ready.
+  setUltButtonState(ui.ultBtn, { ready: !!laserReady, active: !!laserActive });
+  setUltButtonState(ui.laserTopBtn, { ready: !!laserReady, active: !!laserActive });
+  setUltButtonState(ui.nukeBtn, { ready: !!nukeReady, active: !!nukeActive });
+  setUltButtonState(ui.nukeTopBtn, { ready: !!nukeReady, active: !!nukeActive });
+
+  // Desktop hint bar: show ult status + aim mode toggle.
+  syncAimModeHint(ui, { mouseAimEnabled: !!mouseAimEnabled });
+  syncUltStatusHint(ui, {
+    laserOwned: !!laserOwned,
+    nukeOwned: !!nukeOwned,
+    laserActive: !!laserActive,
+    nukeActive: !!nukeActive,
+    laserReady: !!laserReady,
+    nukeReady: !!nukeReady,
+    laserCooldownSeconds: Number(laserCooldownSeconds) || 0,
+    nukeCooldownSeconds: Number(nukeCooldownSeconds) || 0,
+  });
+}
+
+function syncAimModeHint(ui, { mouseAimEnabled }) {
+  if (!ui.aimModeBtn) return;
+  ui.aimModeBtn.textContent = mouseAimEnabled ? 'MOUSE' : 'Z/X';
+  ui.aimModeBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
+}
+
+function syncUltStatusHint(
+  ui,
+  {
+    laserOwned,
+    nukeOwned,
+    laserActive,
+    nukeActive,
+    laserReady,
+    nukeReady,
+    laserCooldownSeconds,
+    nukeCooldownSeconds,
+  }
+) {
+  if (!ui.desktopUltStatus) return;
+
+  const renderOne = (name, key, { owned, active, ready, cooldownSeconds }) => {
+    if (!owned) return `${name} <kbd>${key}</kbd>: <span class="ultState ultState--off">BUY</span>`;
+    if (active) return `${name} <kbd>${key}</kbd>: <span class="ultState ultState--active">ACTIVE</span>`;
+    if (!ready && cooldownSeconds > 0) return `${name} <kbd>${key}</kbd>: <span class="ultState ultState--cooldown">${cooldownSeconds}s</span>`;
+    return `${name} <kbd>${key}</kbd>: <span class="ultState ultState--ready">READY</span>`;
+  };
+
+  ui.desktopUltStatus.innerHTML =
+    renderOne('Laser', 'SPACE', {
+      owned: laserOwned,
+      active: laserActive,
+      ready: laserReady,
+      cooldownSeconds: laserCooldownSeconds,
+    }) +
+    ' <span class="hintSep">|</span> ' +
+    renderOne('Nuke', 'SHIFT', {
+      owned: nukeOwned,
+      active: nukeActive,
+      ready: nukeReady,
+      cooldownSeconds: nukeCooldownSeconds,
+    });
+}
+
+function setUltButtonState(buttonEl, { ready, active }) {
+  if (!buttonEl) return;
+  buttonEl.classList.toggle('isReady', !!ready);
+  buttonEl.classList.toggle('isActive', !!active);
 }
 
 function setUltButtonLabel(buttonEl, text) {
