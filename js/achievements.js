@@ -2,7 +2,13 @@ import { saveAchievements } from './storage.js';
 
 // Minimal "prizes" system: unlock milestones and award bonus cash.
 // Return { unlocked: string[], bonusCash: number }
-export function evaluateRunMilestones({ timeSeconds, level, cashEarned }, unlockedSet) {
+/**
+ * @param {{ timeSeconds: number, level: number, cashEarned: number }} run
+ * @param {Set<string>} unlockedSet
+ * @returns {{ unlocked: string[], bonusCash: number }}
+ */
+export function evaluateRunMilestones(run, unlockedSet) {
+  const { timeSeconds, level, cashEarned } = run;
   const newlyUnlocked = [];
   let bonusCash = 0;
 

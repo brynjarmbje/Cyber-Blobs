@@ -13,6 +13,9 @@ html, body {
     position: relative;
   }
 
+  /* Prevent padding/borders from causing width overflow (especially in modals). */
+  *, *::before, *::after { box-sizing: border-box; }
+
   /* Subtle layered "misty galaxy" backdrop (cheap: gradients only, no JS). */
   @keyframes bgDriftSlow {
     0% { transform: translate3d(-1.5%, -1.0%, 0) scale(1.02); }
@@ -862,9 +865,30 @@ html, body {
   }
 
   /* Modals */
-  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:200; }
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+    padding: 16px;
+  }
   .modal.hidden { display:none; }
-  .modalContent { background:rgba(0,0,0,0.85); border:2px solid #0ff; padding:24px 28px; border-radius:18px; width: min(480px,90%); max-height:80vh; overflow:auto; box-shadow:0 0 20px #0ff; }
+  .modalContent {
+    background: rgba(0,0,0,0.85);
+    border: 2px solid #0ff;
+    padding: 24px 28px;
+    border-radius: 18px;
+    width: min(520px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    box-shadow: 0 0 20px #0ff;
+  }
   .modalContent h2 { margin-top:0; color:#0ff; text-shadow:0 0 10px #0ff; }
   .modalContent { color: rgba(234,255,255,0.95); }
   .modalContent p { color: rgba(234,255,255,0.9); }
@@ -874,11 +898,22 @@ html, body {
 
   .shopSection { margin: 10px 0 16px; padding: 12px 12px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); }
   .shopSectionTitle { font-weight: 900; color: #eaffff; margin-bottom: 8px; }
-  .ultSelect { display:flex; gap:10px; }
+  .ultSelect { display:flex; gap:10px; flex-wrap: wrap; }
   .miniBtn.isSelected { outline: 2px solid rgba(255,255,255,0.45); }
   .shopHint { margin-top: 8px; font-size: 12px; opacity: 0.85; color: #cfefff; }
 
-  .boardSort { display:flex; gap:10px; justify-content:center; margin:8px 0 14px; }
+  .boardSort { display:flex; gap:10px; justify-content:center; margin:8px 0 14px; flex-wrap: wrap; }
+
+  /* Prevent long score lines from pushing the modal wider on small screens */
+  #scoreList {
+    padding-left: 18px;
+    margin: 8px 0 0;
+    max-width: 100%;
+  }
+  #scoreList li {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
   .closeBtn { margin-top:14px; background:#0ff; color:#000; font-weight:700; border:none; padding:8px 16px; border-radius:10px; cursor:pointer; }
   .closeBtn:hover { background:#07b3b3; color:#fff; }
   .trophyGrid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); margin-top:12px; }
@@ -956,6 +991,19 @@ html, body {
 
     /* Level-up toast: slightly smaller on phones to avoid wrapping */
     #levelUpMessage { font-size: 2.4rem; }
+
+    /* Modals: tighter padding + guaranteed fit */
+    .modal { padding: 12px; align-items: flex-start; }
+    .modalContent {
+      width: calc(100vw - 24px);
+      max-width: calc(100vw - 24px);
+      max-height: calc(100dvh - 24px);
+      padding: 16px 14px;
+      border-radius: 16px;
+    }
+    .boardSort { gap: 8px; }
+    .ultSelect { gap: 8px; }
+    .miniBtn { width: 100%; justify-content: center; }
   }
 
   @media (hover:none){

@@ -23,7 +23,9 @@ const music = initMusicSystem(ui, {
 });
 
 window.addEventListener('cyberblobs:playstate', (e) => {
-  const state = e?.detail?.state;
+  /** @type {CustomEvent<{ state?: 'playing' | 'menu' | 'paused' | string }>} */
+  const ce = /** @type {any} */ (e);
+  const state = ce?.detail?.state;
   music.setContext(state === 'playing' ? 'game' : 'menu');
 });
 
