@@ -2,16 +2,18 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v1';
+const CACHE_NAME = 'leikur-cache-v2';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [
   './',
   './index.html',
   './style.css',
+  './CyberBlob-Theme_V1.mp3',
   './js/main.js',
   './js/game.js',
   './js/ui.js',
+  './js/audio.js',
   './js/map.js',
   './js/renderer3d.js',
   './js/constants.js',

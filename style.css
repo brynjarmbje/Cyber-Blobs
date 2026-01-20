@@ -73,6 +73,14 @@ html, body {
   .miniBtn { pointer-events:auto; background: linear-gradient(135deg,#0ff,#2cf); border:none; color:#001; font-weight:800; padding:8px 12px; border-radius:12px; cursor:pointer; font-size:12px; box-shadow:0 10px 24px rgba(0,255,255,0.18); }
   .miniBtn:hover { filter: brightness(1.05); }
   .miniBtn:active { transform: translateY(1px); }
+
+  .miniBtn--music { background: linear-gradient(135deg, #b5ff, #2cf); }
+  .miniBtn.isMuted {
+    background: rgba(255,255,255,0.10);
+    color: rgba(234,255,255,0.85);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: none;
+  }
   .button.small { padding:6px 10px; font-size:0.8rem; }
   #activePowerups { font-weight:600; color:#fff; }
   #livesContainer { display:flex; gap:4px; }

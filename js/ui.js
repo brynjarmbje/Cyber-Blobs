@@ -35,6 +35,7 @@ export function getUiElements() {
     // Modals
     openShopBtn: document.getElementById('openShopBtn'),
     openBoardBtn: document.getElementById('openBoardBtn'),
+    musicBtn: document.getElementById('musicBtn'),
 
     shopModal: document.getElementById('shopModal'),
     closeShopBtn: document.getElementById('closeShopBtn'),
