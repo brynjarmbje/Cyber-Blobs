@@ -1699,16 +1699,22 @@ export function createGame(ui) {
     // Slightly snappier follow on phones (still smooth).
     camera.followLerp = isPhoneLayout ? 0.22 : 0.18;
 
-    // Boost entity sizes on small canvases (e.g. phone layout)
-    sizeScale = clamp(520 / minDim, 1, 1.35);
+    // Size scaling: keep things readable on phones, but don't let entities get too big.
+    // (Phone playfield is smaller, so oversized entities feel cramped.)
+    sizeScale = isPhoneLayout ? clamp(480 / minDim, 1, 1.20) : clamp(520 / minDim, 1, 1.30);
 
-    player.radius = 10 * sizeScale;
+    const basePlayerRadius = isPhoneLayout ? 9.5 : 10;
+    const baseEnemyRadius = isPhoneLayout ? 7.6 : 8;
+    const basePowerupRadius = isPhoneLayout ? 7.6 : 8;
+    const baseLifeRadius = isPhoneLayout ? 8.6 : 9;
+
+    player.radius = basePlayerRadius * sizeScale;
     bulletRadius = 3 * sizeScale;
     bulletHitRadius = bulletRadius + 1.25 * sizeScale;
     bulletSpeed = 5 * (0.9 + 0.1 * sizeScale);
 
-    for (const e of enemies) e.radius = 8 * sizeScale;
-    for (const p of powerUps) p.radius = (p.type === POWERUP_TYPES.life ? 9 : 8) * sizeScale;
+    for (const e of enemies) e.radius = baseEnemyRadius * sizeScale;
+    for (const p of powerUps) p.radius = (p.type === POWERUP_TYPES.life ? baseLifeRadius : basePowerupRadius) * sizeScale;
 
     canvas.width = Math.floor(cssW * dpr);
     canvas.height = Math.floor(cssH * dpr);

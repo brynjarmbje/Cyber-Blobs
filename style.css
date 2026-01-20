@@ -78,9 +78,9 @@ html, body {
     height: 38px;
     padding: 0;
     border-radius: 12px;
-    border: 1px solid rgba(255,255,255,0.14);
+    border: 1px solid rgba(255,255,255,0.16);
     background:
-      radial-gradient(120% 120% at 20% 15%, rgba(0,255,255,0.16), rgba(0,255,255,0.00) 55%),
+      radial-gradient(120% 120% at 20% 15%, rgba(255,255,255,0.14), rgba(255,255,255,0.02) 55%),
       linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
     color: rgba(234,255,255,0.92);
     cursor: pointer;
@@ -120,9 +120,33 @@ html, body {
   }
 
   /* Crisp SVG icons via mask-image (works well on mobile + desktop). */
+  .iconBtn--menu {
+    border-color: rgba(0,255,255,0.22);
+    color: rgba(210,255,255,0.95);
+    background:
+      radial-gradient(120% 120% at 20% 15%, rgba(0,255,255,0.18), rgba(0,255,255,0.02) 55%),
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  }
   .iconBtn--menu::before {
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6.5h16v2H4zm0 4.75h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
     mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6.5h16v2H4zm0 4.75h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
+  }
+
+  .iconBtn--pause {
+    border-color: rgba(255, 80, 200, 0.22);
+    color: rgba(255, 220, 245, 0.95);
+    background:
+      radial-gradient(120% 120% at 20% 15%, rgba(255, 80, 200, 0.18), rgba(255, 80, 200, 0.02) 55%),
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+  }
+
+  .iconBtn--pause[aria-pressed="true"] {
+    /* While paused: make Resume state pop as "safe/green" */
+    border-color: rgba(0, 255, 170, 0.24);
+    color: rgba(210, 255, 240, 0.96);
+    background:
+      radial-gradient(120% 120% at 20% 15%, rgba(0, 255, 170, 0.18), rgba(0, 255, 170, 0.02) 55%),
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
   }
   .iconBtn#pauseBtn[aria-pressed="false"]::before {
     /* Pause icon */
