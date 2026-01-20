@@ -2,7 +2,7 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v4';
+const CACHE_NAME = 'leikur-cache-v6';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [
@@ -11,6 +11,8 @@ const PRECACHE_URLS = [
   './style.css',
   './CyberBlob-Theme_V1.mp3',
   './CyberBlob-Menu-Theme.mp3',
+  './CyberBlob-SoundFX-bullet.mp3',
+  './CyberBlob-SoundFX-kill-v1.mp3',
   './CyberBlob-drum1.mp3',
   './CyberBlob-whine1.mp3',
   './js/main.js',

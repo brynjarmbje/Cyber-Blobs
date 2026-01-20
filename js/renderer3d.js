@@ -1392,6 +1392,8 @@ export function createRenderer3D(glCanvas) {
     const enemyCount = Math.min(es.length, 64);
     ensureEnemyPool(enemyCount);
 
+    const targetEnemyColor = nextEnemyPreview?.color || null;
+
     for (let i = 0; i < enemyCount; i++) {
       const e = es[i];
       const vx = e.vx || 0;
@@ -1407,6 +1409,8 @@ export function createRenderer3D(glCanvas) {
       const sx = e.radius * vis * (1 + squash);
       const sy = e.radius * vis * (1 + squash);
       const sz = e.radius * vis * (1 - squash) * (1 + wob);
+
+      const isTargetEnemy = !!targetEnemyColor && e.color === targetEnemyColor;
 
       tmpColor.copy(colorToThree(e.color));
       const lum = tmpColor.r * 0.2126 + tmpColor.g * 0.7152 + tmpColor.b * 0.0722;
@@ -1437,9 +1441,14 @@ export function createRenderer3D(glCanvas) {
       g.visible = true;
       g.position.set(ex, ey, 20);
       // Thin outline (tiny) so even black enemies read on black.
-      g.scale.set(sx * 1.06, sy * 1.06, sz * 1.06);
+      const pulse01 = 0.5 + 0.5 * Math.sin(tNow / 200 + (e.blobSeed || 0) * 0.7);
+      const glowScale = isTargetEnemy ? (1.10 + 0.02 * pulse01) : 1.06;
+      g.scale.set(sx * glowScale, sy * glowScale, sz * glowScale);
+
+      // Keep this extremely simple for perf: just pulse outline opacity for target.
+      // No blending/depthTest switches (those can cause hitches on some GPUs).
       g.material.color.set(isVeryDark ? 0xf0f0f0 : 0xe0e0e0);
-      g.material.opacity = isVeryDark ? 0.22 : 0.14;
+      g.material.opacity = (isVeryDark ? 0.22 : 0.14) + (isTargetEnemy ? (0.10 + 0.08 * pulse01) : 0);
       if (g.material.userData && g.material.userData.shader) {
         g.material.userData.shader.uniforms.uTime.value = tNow;
         g.material.userData.shader.uniforms.uSeed.value = (e.blobSeed || 0) + i * 0.37;

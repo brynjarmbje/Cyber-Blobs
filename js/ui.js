@@ -37,6 +37,7 @@ export function getUiElements() {
     openBoardBtn: document.getElementById('openBoardBtn'),
     musicBtn: document.getElementById('musicBtn'),
     pauseBtn: document.getElementById('pauseBtn'),
+    mouseAimBtn: document.getElementById('mouseAimBtn'),
 
     shopModal: document.getElementById('shopModal'),
     closeShopBtn: document.getElementById('closeShopBtn'),
@@ -101,11 +102,11 @@ export function updateHud(ui, state) {
   } = state;
 
   if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(level);
-  if (ui.hudTimeEl) ui.hudTimeEl.textContent = elapsedSeconds.toFixed(2);
+  if (ui.hudTimeEl) ui.hudTimeEl.textContent = String(Math.max(0, Math.floor(elapsedSeconds)));
 
   // NEXT target: rendered by the 3D renderer into the swatch canvas.
-  if (ui.nextColorSwatchEl) ui.nextColorSwatchEl.title = nextColor ? `NEXT: ${nextColor}` : 'NEXT';
-  if (ui.nextColorNameEl) ui.nextColorNameEl.textContent = '';
+  if (ui.nextColorSwatchEl) ui.nextColorSwatchEl.title = nextColor ? `Target: ${nextColor}` : 'Target';
+  if (ui.nextColorNameEl) ui.nextColorNameEl.textContent = nextColor ? String(nextColor).toUpperCase() : '';
 
   renderLives(ui.livesContainerEl, lives);
 

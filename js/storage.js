@@ -140,3 +140,14 @@ export function loadOwnedUltimates() {
 export function saveOwnedUltimates(set) {
   localStorage.setItem(STORAGE_KEYS.ultimatesOwned, JSON.stringify(Array.from(set)));
 }
+
+// null = not set yet
+export function loadMouseAimEnabled() {
+  const v = localStorage.getItem(STORAGE_KEYS.mouseAim);
+  if (v == null) return null;
+  return v !== 'false';
+}
+
+export function saveMouseAimEnabled(enabled) {
+  localStorage.setItem(STORAGE_KEYS.mouseAim, enabled ? 'true' : 'false');
+}

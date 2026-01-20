@@ -17,26 +17,32 @@
   <header id="topBar">
     <div class="brand">
       <div class="brandTitle">ColorSurvival</div>
-      <div class="brandSub">Survive. Hit the NEXT enemy.</div>
+      <div class="brandSub">Survive. Hit the target enemy.</div>
     </div>
 
     <div class="hudRow" role="status" aria-label="Game HUD">
       <div class="hudItem"><span class="label">LEVEL</span><span id="hudLevel">1</span></div>
       <div class="hudItem"><span class="label">TIME</span><span id="hudTime">0.00</span></div>
       <div class="hudItem">
-        <span class="label">NEXT</span>
+        <span class="label" id="nextColorName"></span>
         <span class="nextWrap" id="hudNextColor">
-          <canvas class="colorSwatch" id="nextColorSwatch" width="22" height="22" aria-label="Next enemy"></canvas>
+          <canvas class="colorSwatch" id="nextColorSwatch" width="22" height="22" aria-label="Target enemy"></canvas>
         </span>
       </div>
       <div class="hudItem"><span class="label">CASH</span><span id="colorCash">0</span></div>
     </div>
 
     <div class="actions">
-      <button id="openShopBtn" class="miniBtn" type="button">SHOP</button>
-      <button id="openBoardBtn" class="miniBtn" type="button">SCORES</button>
-      <button id="musicBtn" class="miniBtn miniBtn--music" type="button" aria-pressed="true">MUSIC ON</button>
-      <button id="pauseBtn" class="miniBtn miniBtn--pause" type="button" aria-pressed="false">PAUSE</button>
+      <details class="menu" id="menu">
+        <summary class="iconBtn iconBtn--menu" aria-label="Menu" title="Menu"></summary>
+        <div class="menuPanel" role="menu" aria-label="Menu">
+          <button id="openShopBtn" class="menuItem" type="button" role="menuitem">Shop</button>
+          <button id="openBoardBtn" class="menuItem" type="button" role="menuitem">Scores</button>
+          <button id="musicBtn" class="menuItem" type="button" role="menuitem" aria-pressed="true">MUSIC ON</button>
+          <button id="mouseAimBtn" class="menuItem menuItem--desktop" type="button" role="menuitem" aria-pressed="true">Mouse Aim: ON</button>
+        </div>
+      </details>
+      <button id="pauseBtn" class="iconBtn iconBtn--pause" type="button" aria-pressed="false" aria-label="Pause" title="Pause"></button>
     </div>
   </header>
 

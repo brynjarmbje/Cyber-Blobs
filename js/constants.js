@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   achievements: 'cs_achievements_v1',
   ultimate: 'cs_ultimate_v1',
   ultimatesOwned: 'cs_ultimates_owned_v1',
+  mouseAim: 'cs_mouse_aim_v1',
 };
 
 export const COLOR_CASH_VALUES = {

@@ -16,7 +16,9 @@ import {
   loadOwnedUltimates,
   loadOwnedTrophies,
   loadUltimateType,
+  loadMouseAimEnabled,
   saveCash,
+  saveMouseAimEnabled,
   saveOwnedUltimates,
   saveOwnedTrophies,
   saveUltimateType,
@@ -139,6 +141,26 @@ export function createGame(ui) {
     aim: { x: 0, y: 0, active: false },
   };
 
+  // Desktop mouse aim (optional)
+  const mouseAimDefault =
+    globalThis.matchMedia?.('(pointer: fine)')?.matches &&
+    globalThis.matchMedia?.('(hover: hover)')?.matches;
+  let mouseAimEnabled = (() => {
+    const stored = loadMouseAimEnabled();
+    if (stored == null) return !!mouseAimDefault;
+    return !!stored;
+  })();
+  let mouseAimCanvasX = 0;
+  let mouseAimCanvasY = 0;
+  let mouseAimClientX = 0;
+  let mouseAimClientY = 0;
+  let canvasRect = null;
+  const refreshCanvasRect = () => {
+    canvasRect = canvas.getBoundingClientRect();
+  };
+  let lastMouseAimInputMs = -Infinity;
+  const MOUSE_AIM_ACTIVE_WINDOW_MS = 2000;
+
   // Enemies / bullets / particles
   let enemies = [];
   let bullets = [];
@@ -150,6 +172,82 @@ export function createGame(ui) {
   // Automatic shooting
   let shootDelayMs = 250;
   let lastShotTimeMs = 0;
+
+  function createSfxPool(src, { poolSize = 6, volume = 0.12 } = {}) {
+    const pool = [];
+    for (let i = 0; i < poolSize; i++) {
+      const a = new Audio(src);
+      a.preload = 'auto';
+      a.volume = volume;
+      pool.push(a);
+    }
+
+    let idx = 0;
+    let unlocked = false;
+
+    async function unlockAll() {
+      // Must be called from a user gesture.
+      let anyOk = false;
+      for (const a of pool) {
+        const prevVol = a.volume;
+        try {
+          a.volume = 0;
+          await a.play();
+          a.pause();
+          try {
+            a.currentTime = 0;
+          } catch {
+            // ignore
+          }
+          a.volume = prevVol;
+          anyOk = true;
+        } catch {
+          try {
+            a.volume = prevVol;
+          } catch {
+            // ignore
+          }
+        }
+      }
+      unlocked = anyOk;
+      return unlocked;
+    }
+
+    // Unlock on first interaction (mobile autoplay policy).
+    const unlockOnce = () => {
+      void unlockAll();
+    };
+    for (const t of [ui?.gameShell, ui?.canvas, document].filter(Boolean)) {
+      t.addEventListener('pointerdown', unlockOnce, { once: true, passive: true });
+      t.addEventListener('touchstart', unlockOnce, { once: true, passive: true });
+    }
+
+    function isAudioEnabled() {
+      // Reuse the music toggle as the global audio toggle.
+      const btn = ui?.musicBtn;
+      if (!btn) return true;
+      return btn.getAttribute('aria-pressed') !== 'false';
+    }
+
+    function play() {
+      if (!unlocked) return;
+      if (!isAudioEnabled()) return;
+      const a = pool[idx++ % pool.length];
+      try {
+        a.pause();
+        a.currentTime = 0;
+      } catch {
+        // ignore
+      }
+      a.volume = volume;
+      void a.play().catch(() => {});
+    }
+
+    return { play };
+  }
+
+  const bulletSfx = createSfxPool('./CyberBlob-SoundFX-bullet.mp3', { poolSize: 6, volume: 0.14 });
+  const killSfx = createSfxPool('./CyberBlob-SoundFX-kill-v1.mp3', { poolSize: 5, volume: 0.16 });
 
   // Powerups
   let powerUps = [];
@@ -374,6 +472,7 @@ export function createGame(ui) {
   function killEnemyByIndex(enemyIndex, hitX, hitY) {
     const e = enemies[enemyIndex];
     if (!e) return;
+    killSfx.play();
     spawnEnemyDeathParticles(e.x, e.y, e.color);
     spawnHitSuccess(hitX, hitY, e.color);
     addCashForColor(e.color);
@@ -394,16 +493,20 @@ export function createGame(ui) {
   }
 
   function getLaserButtonText(nowMs) {
+    const showKeyHint = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
     if (!ult.laser.owned) return 'LASER';
-    if (ult.laser.active) return 'LASER ACTIVE\nSPACE';
+    if (ult.laser.active) return showKeyHint ? 'LASER ACTIVE\nSPACE' : 'LASER ACTIVE';
     const cd = getCooldownText(nowMs, ult.laser.cooldownMs, ult.laser.lastUsedMs);
+    if (!showKeyHint) return cd ? `LASER ${cd}` : 'LASER';
     return cd ? `LASER ${cd}\nSPACE` : 'LASER\nSPACE';
   }
 
   function getNukeButtonText(nowMs) {
+    const showKeyHint = window.matchMedia('(hover:hover) and (pointer:fine)').matches;
     if (!ult.nuke.owned) return 'NUKE';
-    if (ult.nuke.active) return 'NUKE ACTIVE\nSHIFT';
+    if (ult.nuke.active) return showKeyHint ? 'NUKE ACTIVE\nSHIFT' : 'NUKE ACTIVE';
     const cd = getCooldownText(nowMs, ult.nuke.cooldownMs, ult.nuke.lastUsedMs);
+    if (!showKeyHint) return cd ? `NUKE ${cd}` : 'NUKE';
     return cd ? `NUKE ${cd}\nSHIFT` : 'NUKE\nSHIFT';
   }
 
@@ -771,9 +874,11 @@ export function createGame(ui) {
       }
       spawnMuzzle(player.x, player.y);
       spawnCircleBurst(player.x, player.y, 'rgba(0,0,0,0.4)', 6, 16);
+      bulletSfx.play();
     } else {
       bullets.push({ x: player.x, y: player.y, vx: Math.cos(aimAngle), vy: Math.sin(aimAngle), bounceCount: 0, seed: Math.random() * Math.PI * 2 });
       spawnMuzzle(player.x, player.y);
+      bulletSfx.play();
     }
   }
 
@@ -1062,10 +1167,21 @@ export function createGame(ui) {
       if (keys.ArrowRight || keys.d) moveX = player.speed * dtFrames;
     }
 
-    // Aim: right stick sets absolute direction when engaged; otherwise use Z/X
+    // Aim priority:
+    // 1) Right stick (touch)
+    // 2) Mouse aim (desktop option)
+    // 3) Z/X fallback
     const aimMag = Math.hypot(axes.aim.x, axes.aim.y);
     if (axes.aim.active && aimMag > 0.2) {
       aimAngle = Math.atan2(axes.aim.y, axes.aim.x);
+    } else if (mouseAimEnabled && nowMs - lastMouseAimInputMs <= MOUSE_AIM_ACTIVE_WINDOW_MS) {
+      if (!canvasRect) refreshCanvasRect();
+      // Convert to canvas-relative coords once per frame (avoid layout reads in mousemove handlers).
+      mouseAimCanvasX = mouseAimClientX - canvasRect.left;
+      mouseAimCanvasY = mouseAimClientY - canvasRect.top;
+      const wx = camera.x + mouseAimCanvasX;
+      const wy = camera.y + mouseAimCanvasY;
+      aimAngle = Math.atan2(wy - player.y, wx - player.x);
     } else {
       if (keys.z) aimAngle -= AIM_STEP * dtFrames;
       if (keys.x) aimAngle += AIM_STEP * dtFrames;
@@ -1462,6 +1578,42 @@ export function createGame(ui) {
     // Shop purchases
     ui.ultLaserBtn?.addEventListener('click', () => buyUltimate('laser'));
     ui.ultNukeBtn?.addEventListener('click', () => buyUltimate('nuke'));
+
+    const syncMouseAimUi = () => {
+      if (!ui.mouseAimBtn) return;
+      ui.mouseAimBtn.textContent = `Mouse Aim: ${mouseAimEnabled ? 'ON' : 'OFF'}`;
+      ui.mouseAimBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
+      ui.mouseAimBtn.classList.toggle('isMuted', !mouseAimEnabled);
+    };
+
+    syncMouseAimUi();
+
+    ui.mouseAimBtn?.addEventListener('click', () => {
+      mouseAimEnabled = !mouseAimEnabled;
+      saveMouseAimEnabled(mouseAimEnabled);
+      syncMouseAimUi();
+    });
+
+    const updateMouseAimFromEvent = (e) => {
+      if (!mouseAimEnabled) return;
+      // Only treat actual mouse movement as mouse-aim input.
+      if (e.pointerType && e.pointerType !== 'mouse') return;
+      mouseAimClientX = e.clientX;
+      mouseAimClientY = e.clientY;
+      lastMouseAimInputMs = performance.now();
+    };
+
+    canvas.addEventListener('pointermove', updateMouseAimFromEvent, { passive: true });
+    // Fallback for older browsers that don't fully support Pointer Events.
+    canvas.addEventListener('mousemove', (e) => {
+      updateMouseAimFromEvent({ clientX: e.clientX, clientY: e.clientY, pointerType: 'mouse' });
+    }, { passive: true });
+
+    canvas.addEventListener('pointerenter', () => {
+      refreshCanvasRect();
+    }, { passive: true });
+
+    window.addEventListener('scroll', refreshCanvasRect, { passive: true });
   }
 
   function installJoystick(stickEl, knobEl, axis) {
@@ -1535,10 +1687,19 @@ export function createGame(ui) {
     world.dpr = dpr;
 
     ensureMapSize();
-    camera.deadzoneRadius = clamp(Math.min(world.w, world.h) * 0.22, 90, 200);
+
+    const minDim = Math.max(1, Math.min(world.w, world.h));
+    // On phones the UI takes more vertical space and the player needs more forward visibility.
+    // A smaller deadzone makes the camera follow sooner (player stays closer to center).
+    const isPhoneLayout = minDim <= 520 || Math.min(window.innerWidth, window.innerHeight) <= 600;
+    camera.deadzoneRadius = isPhoneLayout
+      ? clamp(minDim * 0.16, 64, 160)
+      : clamp(minDim * 0.22, 90, 200);
+
+    // Slightly snappier follow on phones (still smooth).
+    camera.followLerp = isPhoneLayout ? 0.22 : 0.18;
 
     // Boost entity sizes on small canvases (e.g. phone layout)
-    const minDim = Math.max(1, Math.min(world.w, world.h));
     sizeScale = clamp(520 / minDim, 1, 1.35);
 
     player.radius = 10 * sizeScale;
@@ -1564,6 +1725,9 @@ export function createGame(ui) {
     player.y = clamp(player.y, player.radius, map.h - player.radius);
     clampCameraToMap();
     updateCamera();
+
+    // Keep cached rect in sync (used for mouse aim).
+    refreshCanvasRect();
   }
 
   function start() {

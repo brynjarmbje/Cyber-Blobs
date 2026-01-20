@@ -54,7 +54,7 @@ html, body {
     font-variant-numeric: tabular-nums;
   }
   #hudLevel { min-width: 2ch; }
-  #hudTime { min-width: 6ch; }
+  #hudTime { min-width: 4ch; }
   #colorCash { min-width: 4ch; }
 
   .nextWrap { display:flex; align-items:center; gap:6px; }
@@ -69,7 +69,118 @@ html, body {
     letter-spacing: 0.4px;
   }
 
-  .actions { display:flex; justify-content:flex-end; gap:10px; }
+  .actions { display:flex; justify-content:flex-end; gap:10px; align-items:center; }
+
+  /* Icon buttons (menu/pause) */
+  .iconBtn {
+    pointer-events: auto;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.14);
+    background:
+      radial-gradient(120% 120% at 20% 15%, rgba(0,255,255,0.16), rgba(0,255,255,0.00) 55%),
+      linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
+    color: rgba(234,255,255,0.92);
+    cursor: pointer;
+    box-shadow:
+      0 16px 34px rgba(0,0,0,0.32),
+      0 0 0 1px rgba(0,0,0,0.45) inset;
+    backdrop-filter: blur(10px);
+    font-size: 0; /* hide any JS-set text */
+    display: grid;
+    place-items: center;
+    transition: transform 120ms ease, filter 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+  }
+  .iconBtn:hover {
+    filter: brightness(1.06);
+    border-color: rgba(0,255,255,0.28);
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.38),
+      0 0 22px rgba(0,255,255,0.10);
+  }
+  .iconBtn:active { transform: translateY(1px) scale(0.98); }
+  .iconBtn:focus-visible {
+    outline: 2px solid rgba(0,255,255,0.45);
+    outline-offset: 2px;
+  }
+  .iconBtn::before {
+    content: '';
+    width: 18px;
+    height: 18px;
+    background: currentColor;
+    opacity: 0.95;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    -webkit-mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+    mask-size: contain;
+  }
+
+  /* Crisp SVG icons via mask-image (works well on mobile + desktop). */
+  .iconBtn--menu::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6.5h16v2H4zm0 4.75h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M4 6.5h16v2H4zm0 4.75h16v2H4zM4 16h16v2H4z'/%3E%3C/svg%3E");
+  }
+  .iconBtn#pauseBtn[aria-pressed="false"]::before {
+    /* Pause icon */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 5h3v14H7zm7 0h3v14h-3z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M7 5h3v14H7zm7 0h3v14h-3z'/%3E%3C/svg%3E");
+  }
+  .iconBtn#pauseBtn[aria-pressed="true"]::before {
+    /* Play icon (when paused, button shows resume) */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l12-7z'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M8 5v14l12-7z'/%3E%3C/svg%3E");
+  }
+
+  /* Menu dropdown */
+  .menu { position: relative; }
+  .menu > summary { list-style: none; }
+  .menu > summary::-webkit-details-marker { display: none; }
+  .menu[open] > summary {
+    border-color: rgba(0,255,255,0.34);
+    box-shadow:
+      0 18px 40px rgba(0,0,0,0.40),
+      0 0 0 1px rgba(0,255,255,0.10) inset,
+      0 0 22px rgba(0,255,255,0.12);
+  }
+  .menuPanel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 140px;
+    padding: 8px;
+    border-radius: 14px;
+    background: rgba(0,0,0,0.75);
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 22px 50px rgba(0,0,0,0.45);
+    backdrop-filter: blur(12px);
+    display: none;
+    z-index: 80;
+  }
+  .menu[open] .menuPanel { display: grid; gap: 8px; }
+  .menuItem {
+    pointer-events: auto;
+    width: 100%;
+    text-align: left;
+    padding: 10px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: rgba(234,255,255,0.95);
+    font-weight: 800;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+  }
+  .menuItem:hover { background: rgba(0,255,255,0.10); border-color: rgba(0,255,255,0.22); }
+  .menuItem.isMuted { opacity: 0.78; }
+
+  /* Desktop-only settings in the menu */
+  @media (hover: none), (pointer: coarse) {
+    .menuItem--desktop { display: none; }
+  }
   .miniBtn { pointer-events:auto; background: linear-gradient(135deg,#0ff,#2cf); border:none; color:#001; font-weight:800; padding:8px 12px; border-radius:12px; cursor:pointer; font-size:12px; box-shadow:0 10px 24px rgba(0,255,255,0.18); }
   .miniBtn:hover { filter: brightness(1.05); }
   .miniBtn:active { transform: translateY(1px); }
@@ -198,7 +309,7 @@ html, body {
       top: 10px;
       left: 50%;
       transform: translateX(-50%);
-      display: flex;
+      display: none;
       flex-direction: row;
       flex-wrap: wrap;
       gap: 8px;
@@ -310,22 +421,28 @@ html, body {
 
     #desktopControlsHint {
       position:absolute;
-      left:50%;
+      left: 12px;
+      right: 12px;
       bottom: 12px;
-      transform: translateX(-50%);
+      transform: none;
       display:flex;
       align-items:center;
-      gap: 10px;
+      justify-content: center;
+      gap: 8px;
       padding: 8px 12px;
       border-radius: 999px;
       background: rgba(0,0,0,0.45);
       border: 1px solid rgba(255,255,255,0.10);
       color: rgba(255,255,255,0.9);
-      font-size: 12px;
+      font-size: 11px;
       backdrop-filter: blur(10px);
       pointer-events:none;
       user-select:none;
+      flex-wrap: nowrap;
+      white-space: nowrap;
     }
+
+    #desktopControlsHint .hintGroup { white-space: nowrap; }
     #desktopControlsHint kbd {
       background: rgba(255,255,255,0.10);
       border: 1px solid rgba(255,255,255,0.18);
@@ -434,6 +551,9 @@ html, body {
     gap: 12px;
     pointer-events:none;
     z-index: 60;
+
+    /* Keep sticks circular even when space is tight (Android flex shrink can squash width). */
+    --joySize: clamp(112px, 22vw, 140px);
   }
 
   #touchUltStack {
@@ -448,8 +568,8 @@ html, body {
   .ultBtn {
     pointer-events:auto;
     align-self:center;
-    height: 64px;
-    min-width: 76px;
+    height: 56px;
+    min-width: 70px;
     border-radius: 18px;
     border: 1px solid rgba(255,255,255,0.16);
     background: rgba(0,0,0,0.55);
@@ -477,8 +597,11 @@ html, body {
   }
   .ultBtn:active { transform: scale(0.98); }
   .joystick {
-    width: 140px;
-    height: 140px;
+    width: var(--joySize);
+    height: var(--joySize);
+    flex: 0 0 var(--joySize);
+    flex-shrink: 0;
+    aspect-ratio: 1 / 1;
     border-radius: 999px;
     background: rgba(255,255,255,0.06);
     border: 1px solid rgba(255,255,255,0.14);
@@ -489,8 +612,8 @@ html, body {
     touch-action: none;
   }
   .joystick .knob {
-    width: 56px;
-    height: 56px;
+    width: calc(var(--joySize) * 0.4);
+    height: calc(var(--joySize) * 0.4);
     border-radius: 999px;
     background: linear-gradient(135deg,#0ff,#2cf);
     box-shadow: 0 12px 30px rgba(0,255,255,0.25);
@@ -549,7 +672,8 @@ html, body {
       justify-content: flex-end;
       align-self: center;
     }
-    .actions .miniBtn { padding: 8px 10px; font-size: 12px; }
+    .actions { gap: 8px; }
+    .iconBtn { width: 36px; height: 36px; border-radius: 12px; }
     .hudItem.wide { flex: 1 1 100%; }
     #desktopControlsHint { display:none; }
     #touchControls { display:flex; }
@@ -567,23 +691,27 @@ html, body {
   }
 
   @media (max-width: 600px){
-    #topBar { padding: 10px 12px; }
-    .brandTitle { font-size: 18px; }
-    .brandSub { font-size: 11px; }
+    #topBar { padding: 8px 10px; gap: 10px 10px; }
+    .brandTitle { font-size: 16px; }
+    .brandSub { font-size: 10px; }
 
-    .hudRow { padding: 8px 10px; border-radius: 16px; }
-    .hudItem { font-size: 12px; }
-    .hudItem .label { font-size: 10px; }
+    .hudRow { padding: 6px 8px; border-radius: 14px; gap: 6px 10px; }
+    .hudItem { font-size: 11px; gap: 6px; }
+    .hudItem .label { font-size: 9px; }
 
-    .actions .miniBtn { padding: 8px 10px; font-size: 12px; border-radius: 12px; }
+    .colorSwatch { width: 18px; height: 18px; border-width: 2px; }
 
-    /* Touch ultimate buttons (LASER/NUKE) smaller on phones */
-    #touchUltStack { gap: 8px; }
-    #touchUltStack .ultBtn { height: 54px; min-width: 66px; border-radius: 16px; }
-    #touchUltStack .ultBtn .ultMain { font-size: 12px; }
-    #touchUltStack .ultBtn .ultKey { font-size: 10px; }
+    .actions { gap: 8px; }
+    .iconBtn { width: 34px; height: 34px; border-radius: 11px; }
 
-    #gameShell { height: min(76vh, calc(100vh - 230px)); }
+    /* Touch controls smaller on phones */
+    #touchControls { padding: 12px; gap: 10px; --joySize: clamp(96px, 20vw, 128px); }
+    #touchUltStack { gap: 6px; }
+    #touchUltStack .ultBtn { height: 40px; min-width: 58px; border-radius: 12px; }
+    #touchUltStack .ultBtn .ultMain { font-size: 11px; }
+    #touchUltStack .ultBtn .ultKey { font-size: 9px; }
+
+    #gameShell { height: min(78vh, calc(100vh - 210px)); }
 
     #activeOverlay { font-size: 14px; }
     #ultTopBtn { padding: 10px 12px; font-size: 13px; }

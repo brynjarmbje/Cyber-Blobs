@@ -43,12 +43,26 @@ export function initMusicSystem(ui, opts = {}) {
   const volumeMenu = clampNumber(opts.volumeMenu ?? 0.30, 0, 1);
   const stingerVolume = clampNumber(opts.stingerVolume ?? 0.55, 0, 1);
 
+  // Stinger frequency controls (stingers are *extras*):
+  // - Only evaluated at loop boundaries / restarts so they stay in sync.
+  // - Default: ~1 in 10 loops on average.
+  const stingerChancePerLoop = clampNumber(opts.stingerChancePerLoop ?? 0.10, 0, 1);
+  const stingerMinLoopsBetween = Math.max(0, Math.floor(opts.stingerMinLoopsBetween ?? 6));
+
+  // Try to use WebAudio for near-gapless looping. Some MP3s include encoder padding;
+  // trimming silence helps remove audible gaps.
+  const preferWebAudio = opts.preferWebAudio !== false;
+  const trimSilence = opts.trimSilence !== false;
+
   let enabled = initialEnabled;
   let context = opts.context === 'menu' || opts.context === 'off' ? opts.context : 'game';
-  let unlocked = false;
 
-  const game = createTrack(gameSrc, volumeGame);
-  const menu = menuSrc ? createTrack(menuSrc, volumeMenu) : null;
+  /** @type {AudioContext|null} */
+  let audioCtx = null;
+
+  const game = createMusicTrack(gameSrc, volumeGame, { preferWebAudio, trimSilence });
+  const menu = menuSrc ? createMusicTrack(menuSrc, volumeMenu, { preferWebAudio, trimSilence }) : null;
+  const stingerPool = createStingerPool(stingers, stingerVolume);
 
   let wasPlayingBeforeHide = false;
   let hiddenContext = context;
@@ -58,6 +72,10 @@ export function initMusicSystem(ui, opts = {}) {
     if (context === 'game') return game;
     if (context === 'menu') return menu || game;
     return null;
+  }
+
+  function canAutoplay(track) {
+    return !!track && track.unlocked === true;
   }
 
   function setButtonState() {
@@ -79,17 +97,123 @@ export function initMusicSystem(ui, opts = {}) {
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  function playStinger() {
-    if (!enabled || !unlocked) return;
-    const src = pickRandom(stingers);
-    if (!src) return;
+  let lastStingerSrc = null;
 
-    const a = new Audio(src);
-    a.loop = false;
-    a.preload = 'auto';
-    a.volume = stingerVolume;
-    // Fire and forget.
-    void a.play().catch(() => {});
+  function pickRandomNotSame(arr, getKey) {
+    if (!arr || arr.length === 0) return null;
+    if (arr.length === 1) return arr[0];
+
+    // Try a few times to avoid repeats.
+    for (let i = 0; i < 6; i++) {
+      const cand = arr[Math.floor(Math.random() * arr.length)];
+      const key = typeof getKey === 'function' ? getKey(cand) : cand;
+      if (key !== lastStingerSrc) return cand;
+    }
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  const loopCounts = { game: 0, menu: 0 };
+  const loopsSinceStinger = { game: 9999, menu: 9999 };
+
+  function shouldPlayStinger(trackKey) {
+    if (trackKey !== 'game' && trackKey !== 'menu') return false;
+
+    loopCounts[trackKey] += 1;
+    loopsSinceStinger[trackKey] += 1;
+
+    // Always keep some space between stingers.
+    if (loopsSinceStinger[trackKey] < stingerMinLoopsBetween) return false;
+
+    // Random chance per loop (e.g., 0.10 ≈ 1 out of 10 loops).
+    if (Math.random() > stingerChancePerLoop) return false;
+
+    loopsSinceStinger[trackKey] = 0;
+    return true;
+  }
+
+  function playStinger(trackKey) {
+    if (!enabled) return;
+    if (!shouldPlayStinger(trackKey)) return;
+
+    const available = stingerPool.filter((s) => s.unlocked);
+    const s = pickRandomNotSame(available, (x) => x?.src);
+    if (!s) return;
+
+    try {
+      s.audio.pause();
+      s.audio.currentTime = 0;
+      s.audio.volume = s.volume;
+    } catch {
+      // ignore
+    }
+    lastStingerSrc = s.src;
+    void s.audio.play().catch(() => {});
+  }
+
+  async function unlockAudioElement(audio) {
+    // iOS/Safari may require a gesture for *each* audio element.
+    // We unlock by playing silently for a tick, then pausing and rewinding.
+    const prevVol = audio.volume;
+    try {
+      audio.volume = 0;
+      await audio.play();
+      audio.pause();
+      try {
+        audio.currentTime = 0;
+      } catch {
+        // ignore
+      }
+      audio.volume = prevVol;
+      return true;
+    } catch {
+      try {
+        audio.volume = prevVol;
+      } catch {
+        // ignore
+      }
+      return false;
+    }
+  }
+
+  async function unlockAllAudio() {
+    // Run only from a user gesture handler.
+    if (preferWebAudio) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        await audioCtx.resume();
+      } catch {
+        // If WebAudio isn't available, we fall back to HTMLAudio.
+        audioCtx = null;
+      }
+    }
+
+    const results = [];
+
+    // Unlock long tracks. Prefer WebAudio unlock (AudioContext.resume) if available.
+    if (audioCtx) {
+      game.unlocked = true;
+      results.push(true);
+      if (menu) {
+        menu.unlocked = true;
+        results.push(true);
+      }
+    } else {
+      results.push(await unlockAudioElement(game.audio));
+      if (results[results.length - 1]) game.unlocked = true;
+
+      if (menu) {
+        results.push(await unlockAudioElement(menu.audio));
+        if (results[results.length - 1]) menu.unlocked = true;
+      }
+    }
+
+    for (const s of stingerPool) {
+      const ok = await unlockAudioElement(s.audio);
+      if (ok) s.unlocked = true;
+    }
+
+    // If we couldn't unlock the active track, we'll keep gesture listeners.
+    return results.some(Boolean);
   }
 
   async function ensurePlaying(track, { restart = false } = {}) {
@@ -99,22 +223,31 @@ export function initMusicSystem(ui, opts = {}) {
     if (track !== game) game.pause();
     if (menu && track !== menu) menu.pause();
 
-    if (restart) {
-      try {
-        track.audio.currentTime = 0;
-      } catch {
-        // ignore
-      }
-    }
-
-    // If starting from the beginning (fresh start or loop restart), fire a stinger.
-    const isAtStart = (track.audio.currentTime || 0) < 0.08;
-    if (isAtStart) playStinger();
+    const wasStarted = track.hasStarted === true;
 
     try {
-      await track.audio.play();
-      unlocked = true;
+      const ok = await track.play({
+        audioCtx,
+        restart,
+        // Schedule a stinger exactly at loop boundaries.
+        onLoop: () => {
+          // Only fire if we're still in the right context when the loop boundary hits.
+          if (!enabled) return;
+          if (track === game && context !== 'game') return;
+          if (track === menu && context !== 'menu') return;
+          playStinger(track === game ? 'game' : 'menu');
+        },
+      });
+
+      if (!ok) return false;
+
+      track.unlocked = true;
       track.hasStarted = true;
+
+      // Optionally play a stinger at the moment the track (re)starts.
+      // This is still gated by the rarity logic above.
+      if (restart || !wasStarted) playStinger(track === game ? 'game' : 'menu');
+
       return true;
     } catch {
       return false;
@@ -139,6 +272,10 @@ export function initMusicSystem(ui, opts = {}) {
 
   async function onFirstGesture() {
     if (!enabled || context === 'off') return;
+
+    // Unlock all tracks + stingers on first user gesture.
+    await unlockAllAudio();
+
     const t = activeTrack();
     const ok = await ensurePlaying(t, { restart: !t?.hasStarted });
     if (ok) removeGestureListeners();
@@ -154,9 +291,9 @@ export function initMusicSystem(ui, opts = {}) {
       return;
     }
 
-    // Try immediately if already unlocked; otherwise wait for gesture.
+    // Try immediately if the active track is unlocked; otherwise wait for gesture.
     const t = activeTrack();
-    if (unlocked) void ensurePlaying(t, { restart: !t?.hasStarted });
+    if (canAutoplay(t)) void ensurePlaying(t, { restart: !t?.hasStarted });
     else addGestureListeners();
   }
 
@@ -175,7 +312,7 @@ export function initMusicSystem(ui, opts = {}) {
     }
 
     const t = activeTrack();
-    if (unlocked) void ensurePlaying(t, { restart: !t?.hasStarted });
+    if (canAutoplay(t)) void ensurePlaying(t, { restart: !t?.hasStarted });
     else addGestureListeners();
   }
 
@@ -192,24 +329,14 @@ export function initMusicSystem(ui, opts = {}) {
     pauseAll();
   }
 
-  // Hook up looping + stinger on loop restarts.
-  game.audio.addEventListener('ended', () => {
-    if (!enabled || context !== 'game') return;
-    // Restart from beginning; stinger fires at restart.
-    void ensurePlaying(game, { restart: true });
-  });
-  if (menu) {
-    menu.audio.addEventListener('ended', () => {
-      if (!enabled || context !== 'menu') return;
-      void ensurePlaying(menu, { restart: true });
-    });
-  }
-
   if (ui?.musicBtn) {
     ui.musicBtn.addEventListener('click', async () => {
       // Click counts as a gesture and can unlock audio.
       if (!enabled) {
         setEnabled(true);
+
+        await unlockAllAudio();
+
         const t = activeTrack();
         const ok = await ensurePlaying(t, { restart: !t?.hasStarted });
         if (ok) removeGestureListeners();
@@ -233,7 +360,7 @@ export function initMusicSystem(ui, opts = {}) {
     // Resume same context without forcing a restart.
     if (wasPlayingBeforeHide) {
       const t = (hiddenContext === 'game' ? game : (menu || game));
-      if (unlocked) void ensurePlaying(t, { restart: false });
+      if (canAutoplay(t)) void ensurePlaying(t, { restart: false });
       else addGestureListeners();
     }
   });
@@ -243,7 +370,8 @@ export function initMusicSystem(ui, opts = {}) {
   // Preload so the first play after gesture is fast.
   void game.audio.load?.();
   void menu?.audio.load?.();
-  if (enabled && !unlocked && context !== 'off') addGestureListeners();
+  for (const s of stingerPool) void s.audio.load?.();
+  if (enabled && !canAutoplay(activeTrack()) && context !== 'off') addGestureListeners();
 
   return {
     isEnabled: () => enabled,
@@ -257,6 +385,7 @@ export function initMusicSystem(ui, opts = {}) {
     _debug: {
       gameAudio: game.audio,
       menuAudio: menu?.audio || null,
+      stingers: stingerPool.map((s) => s.audio),
     },
   };
 }
@@ -269,6 +398,7 @@ function createTrack(src, volume) {
   return {
     audio,
     hasStarted: false,
+    unlocked: false,
     pause: () => {
       try {
         audio.pause();
@@ -277,6 +407,228 @@ function createTrack(src, volume) {
       }
     },
   };
+}
+
+function createMusicTrack(src, volume, { preferWebAudio, trimSilence }) {
+  const base = createTrack(src, volume);
+
+  // WebAudio playback state
+  base._wa = {
+    prefer: !!preferWebAudio,
+    trimSilence: !!trimSilence,
+    buffer: null,
+    gain: null,
+    source: null,
+    startedAt: 0,
+    offset: 0,
+    duration: 0,
+    loopTimer: null,
+    onLoop: null,
+    loading: null,
+  };
+
+  base.play = async ({ audioCtx, restart, onLoop }) => {
+    base._wa.onLoop = typeof onLoop === 'function' ? onLoop : null;
+
+    // Prefer WebAudio if we have a running AudioContext.
+    if (base._wa.prefer && audioCtx) {
+      const ok = await playWebAudioLoop(base, audioCtx, { restart });
+      return ok;
+    }
+
+    // Fallback to HTMLAudio.
+    try {
+      if (restart) {
+        base.audio.currentTime = 0;
+      }
+      await base.audio.play();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const oldPause = base.pause;
+  base.pause = () => {
+    stopWebAudio(base);
+    oldPause();
+  };
+
+  return base;
+}
+
+async function playWebAudioLoop(track, audioCtx, { restart }) {
+  // Ensure buffer loaded
+  if (!track._wa.buffer) {
+    if (!track._wa.loading) {
+      track._wa.loading = (async () => {
+        const res = await fetch(track.audio.src, { cache: 'force-cache' });
+        const arr = await res.arrayBuffer();
+        const decoded = await audioCtx.decodeAudioData(arr);
+        track._wa.buffer = track._wa.trimSilence ? trimSilenceFromBuffer(audioCtx, decoded) : decoded;
+        track._wa.duration = track._wa.buffer.duration || 0;
+      })();
+    }
+    await track._wa.loading;
+  }
+
+  const buffer = track._wa.buffer;
+  if (!buffer || !track._wa.duration) return false;
+
+  // Stop existing
+  stopWebAudio(track);
+
+  if (restart) track._wa.offset = 0;
+
+  const gain = audioCtx.createGain();
+  gain.gain.value = clampNumber(track.audio.volume, 0, 1);
+  gain.connect(audioCtx.destination);
+
+  const source = audioCtx.createBufferSource();
+  source.buffer = buffer;
+  source.loop = true;
+  source.loopStart = 0;
+  source.loopEnd = buffer.duration;
+  source.connect(gain);
+
+  const startAt = audioCtx.currentTime + 0.02;
+  const offset = track._wa.offset % buffer.duration;
+  track._wa.startedAt = startAt;
+  track._wa.gain = gain;
+  track._wa.source = source;
+
+  // Schedule loop-boundary stingers with a timer (WebAudio itself is seamless).
+  scheduleLoopCallback(track, audioCtx);
+
+  try {
+    source.start(startAt, offset);
+    return true;
+  } catch {
+    stopWebAudio(track);
+    return false;
+  }
+}
+
+function stopWebAudio(track) {
+  const wa = track?._wa;
+  if (!wa) return;
+
+  // Update offset if we were playing.
+  try {
+    if (wa.source && wa.duration) {
+      const now = (track._wa_ctx_currentTime || 0);
+      // We can't access currentTime directly here without ctx; offset will be reset on resume.
+      // This function is used mainly for "pause" semantics, where loop continuity is not critical.
+    }
+  } catch {
+    // ignore
+  }
+
+  if (wa.loopTimer) {
+    clearTimeout(wa.loopTimer);
+    wa.loopTimer = null;
+  }
+
+  try {
+    wa.source?.stop?.();
+  } catch {
+    // ignore
+  }
+
+  try {
+    wa.source?.disconnect?.();
+  } catch {
+    // ignore
+  }
+
+  try {
+    wa.gain?.disconnect?.();
+  } catch {
+    // ignore
+  }
+
+  wa.source = null;
+  wa.gain = null;
+}
+
+function scheduleLoopCallback(track, audioCtx) {
+  const wa = track?._wa;
+  if (!wa || !wa.source || !wa.duration) return;
+
+  if (wa.loopTimer) {
+    clearTimeout(wa.loopTimer);
+    wa.loopTimer = null;
+  }
+
+  const onLoop = wa.onLoop;
+  if (typeof onLoop !== 'function') return;
+
+  // First boundary from current offset.
+  const bufferDur = wa.duration;
+  const startedAt = wa.startedAt;
+  const offset = wa.offset % bufferDur;
+  const firstIn = Math.max(0.01, bufferDur - offset);
+
+  const scheduleNext = (inSeconds) => {
+    wa.loopTimer = setTimeout(() => {
+      try {
+        onLoop();
+      } finally {
+        scheduleNext(bufferDur);
+      }
+    }, Math.max(10, Math.floor(inSeconds * 1000)));
+  };
+
+  // Align to the loop boundary.
+  // Account for the startAt scheduling delay.
+  const now = audioCtx.currentTime;
+  const timeUntilStart = Math.max(0, startedAt - now);
+  scheduleNext(timeUntilStart + firstIn);
+}
+
+function trimSilenceFromBuffer(audioCtx, buffer) {
+  // Remove leading/trailing near-silence to reduce MP3 padding gaps.
+  // Conservative threshold to avoid cutting quiet intros/outros.
+  const threshold = 1e-4;
+  const minKeep = Math.min(buffer.length, Math.floor(buffer.sampleRate * 0.20));
+
+  const ch0 = buffer.getChannelData(0);
+  const len = buffer.length;
+
+  let start = 0;
+  while (start < len - minKeep && Math.abs(ch0[start]) < threshold) start++;
+
+  let end = len - 1;
+  while (end > start + minKeep && Math.abs(ch0[end]) < threshold) end--;
+
+  // Add a tiny pad so we don't cut transients.
+  const pad = Math.floor(buffer.sampleRate * 0.01);
+  start = Math.max(0, start - pad);
+  end = Math.min(len - 1, end + pad);
+
+  const newLen = Math.max(1, end - start + 1);
+  if (newLen >= len * 0.995) return buffer;
+
+  const out = audioCtx.createBuffer(buffer.numberOfChannels, newLen, buffer.sampleRate);
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const src = buffer.getChannelData(ch);
+    const dst = out.getChannelData(ch);
+    dst.set(src.subarray(start, start + newLen));
+  }
+  return out;
+}
+
+function createStingerPool(srcList, volume) {
+  const pool = [];
+  for (const src of Array.isArray(srcList) ? srcList : []) {
+    if (typeof src !== 'string' || src.trim().length === 0) continue;
+    const audio = new Audio(src);
+    audio.loop = false;
+    audio.preload = 'auto';
+    audio.volume = clampNumber(volume, 0, 1);
+    pool.push({ src, audio, unlocked: false, volume: clampNumber(volume, 0, 1) });
+  }
+  return pool;
 }
 
 function gestureTargets(ui) {
