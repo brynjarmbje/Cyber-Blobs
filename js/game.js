@@ -1447,6 +1447,8 @@ export function createGame(ui) {
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       const step = bulletSpeed * dtFrames;
+      const beforeX = b.x;
+      const beforeY = b.y;
       b.x += b.vx * step;
       b.y += b.vy * step;
 
@@ -1458,16 +1460,31 @@ export function createGame(ui) {
           break;
         }
       }
+
+      let bouncedOffObstacle = false;
       if (hitWall) {
         if (bounceShots) {
           // crude bounce: reflect based on which axis resolves more
-          const beforeX = b.x - b.vx * step;
-          const beforeY = b.y - b.vy * step;
           const cand1 = resolveCircleVsObstacles(beforeX, b.y, bulletRadius);
           const cand2 = resolveCircleVsObstacles(b.x, beforeY, bulletRadius);
           // If moving only in Y still hits, flip Y; otherwise flip X.
-          if (cand2.hit && !cand1.hit) b.vy *= -1;
-          else b.vx *= -1;
+          if (cand2.hit && !cand1.hit) {
+            b.vy *= -1;
+            b.y = beforeY;
+          } else {
+            b.vx *= -1;
+            b.x = beforeX;
+          }
+
+          // Make sure the bullet is not stuck inside an obstacle.
+          const pushed = resolveCircleVsObstacles(b.x, b.y, bulletRadius);
+          if (pushed.hit) {
+            b.x = pushed.x;
+            b.y = pushed.y;
+          }
+
+          spawnBounceEffect(b.x, b.y);
+          bouncedOffObstacle = true;
           b.bounceCount = (b.bounceCount || 0) + 1;
           if ((b.bounceCount || 0) >= 2) {
             bullets.splice(i, 1);
@@ -1479,7 +1496,7 @@ export function createGame(ui) {
         }
       }
 
-      if (bounceShots) {
+      if (bounceShots && !bouncedOffObstacle) {
         let bounced = false;
         if (b.x <= 0 || b.x >= map.w) {
           b.vx *= -1;
