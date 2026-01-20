@@ -12,6 +12,7 @@ export function getUiElements() {
     gameOverScreen: document.getElementById('gameOverScreen'),
     statsParagraph: document.getElementById('stats'),
     tryAgainBtn: document.getElementById('tryAgainBtn'),
+    checkpointRow: document.getElementById('checkpointRow'),
 
     // HUD
     hudLevelEl: document.getElementById('hudLevel'),
@@ -238,7 +239,7 @@ export function animatePickupToActive(ui, text) {
   anim.addEventListener('finish', () => el.remove(), { once: true });
 }
 
-export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, unlocked }) {
+export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, unlocked, maxStartLevel }) {
   if (!ui.gameOverScreen) return;
   ui.gameOverScreen.style.display = 'block';
 
@@ -251,6 +252,27 @@ export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, un
 
   if (ui.statsParagraph) {
     ui.statsParagraph.textContent = `You survived ${timeSeconds.toFixed(2)} seconds and reached Level ${level}.${extraText}`;
+  }
+
+  if (ui.checkpointRow) {
+    ui.checkpointRow.textContent = '';
+
+    const maxLv = Number.isFinite(maxStartLevel) ? Math.max(0, Math.floor(maxStartLevel)) : 0;
+    if (maxLv >= 10) {
+      const label = document.createElement('div');
+      label.className = 'checkpointLabel';
+      label.textContent = 'Start next run at:';
+      ui.checkpointRow.appendChild(label);
+
+      for (let lv = 10; lv <= maxLv; lv += 10) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'checkpointBtn';
+        btn.dataset.startLevel = String(lv);
+        btn.textContent = `Level ${lv}`;
+        ui.checkpointRow.appendChild(btn);
+      }
+    }
   }
 }
 

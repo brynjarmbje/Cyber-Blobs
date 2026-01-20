@@ -17,8 +17,10 @@ import {
   loadOwnedTrophies,
   loadUltimateType,
   loadMouseAimEnabled,
+  loadMaxStartLevel,
   saveCash,
   saveMouseAimEnabled,
+  saveMaxStartLevel,
   saveOwnedUltimates,
   saveOwnedTrophies,
   saveUltimateType,
@@ -104,6 +106,23 @@ export function createGame(ui) {
   let level = 1;
   let startTimeMs = 0;
   let runStartCash = cash;
+
+  // Checkpoint starts (unlock every 10 levels reached)
+  let maxStartLevelUnlocked = loadMaxStartLevel();
+  let nextRunStartLevel = 1;
+
+  function checkpointForLevel(lv) {
+    const n = Math.floor(lv / 10) * 10;
+    return n >= 10 ? n : 0;
+  }
+
+  function maybeUnlockCheckpoint(lv) {
+    const cp = checkpointForLevel(lv);
+    if (cp > maxStartLevelUnlocked) {
+      maxStartLevelUnlocked = cp;
+      saveMaxStartLevel(maxStartLevelUnlocked);
+    }
+  }
 
   // Visual scale (boost sizes on small screens)
   let sizeScale = 1;
@@ -260,6 +279,9 @@ export function createGame(ui) {
   // Color order for this level
   let levelColors = [];
   let levelNextColorIndex = 0;
+
+  // Level spawning (trickle)
+  let levelSpawn = null;
 
   // Persist cash occasionally
   let cashDirty = false;
@@ -463,7 +485,8 @@ export function createGame(ui) {
   function advanceNextColorIfCleared() {
     const nextTargetColor = levelColors[levelNextColorIndex];
     if (!nextTargetColor) return;
-    if (!enemies.some((en) => en.color === nextTargetColor)) {
+    const pendingForColor = levelSpawn?.pendingByColor?.[nextTargetColor] || 0;
+    if (!enemies.some((en) => en.color === nextTargetColor) && pendingForColor <= 0) {
       levelNextColorIndex++;
       pulseNextColor(ui.nextColorSwatchEl);
     }
@@ -600,8 +623,7 @@ export function createGame(ui) {
     spawnCircleBurst(player.x, player.y, 'rgba(255,255,255,0.75)', 22, 46);
   }
 
-  function getNonOverlappingSpawn() {
-    const spawnRadius = 8 * sizeScale;
+  function getNonOverlappingSpawn(spawnRadius = 8 * sizeScale) {
     let x;
     let y;
     let tries = 0;
@@ -668,12 +690,83 @@ export function createGame(ui) {
   function spawnEnemiesForLevel() {
     enemies = [];
 
-    const enemyCount = Math.min(10, level + 3);
-    for (let i = 0; i < enemyCount; i++) {
-      const { x, y } = getNonOverlappingSpawn();
-      const color = COLOR_ORDER[Math.floor(Math.random() * COLOR_ORDER.length)];
-      const speed = 1 + Math.random() * 1;
+    const clampInt = (n, lo, hi) => Math.max(lo, Math.min(hi, Math.floor(n)));
+
+    // Enemy count scales with level (no early hard cap), but keep an upper cap for performance.
+    // Level 1 -> 4 enemies, Level 30 -> 33 enemies.
+    const enemyCount = clampInt(3 + level, 4, 48);
+
+    // Palette size grows slowly; too many colors makes progression overly long.
+    const colorCount = clampInt(3 + Math.floor(level / 6), 3, 7);
+
+    // Pick a palette (subset of COLOR_ORDER) and sort it by COLOR_ORDER so the UI/target feels consistent.
+    const shuffled = [...COLOR_ORDER].sort(() => Math.random() - 0.5);
+    const palette = shuffled.slice(0, colorCount);
+    palette.sort((c1, c2) => COLOR_ORDER.indexOf(c1) - COLOR_ORDER.indexOf(c2));
+
+    // Allocate how many enemies of each color will spawn this level.
+    // Ensure at least 1 per palette color so the sequence is always completable.
+    const pendingByColor = Object.create(null);
+    for (const c of palette) pendingByColor[c] = 1;
+    let remaining = enemyCount - palette.length;
+    while (remaining-- > 0) {
+      const c = palette[Math.floor(Math.random() * palette.length)];
+      pendingByColor[c]++;
+    }
+
+    levelColors = palette;
+    levelNextColorIndex = 0;
+
+    const minDim = Math.max(1, Math.min(world.w, world.h));
+    const isPhoneLayout = minDim <= 520 || Math.min(window.innerWidth, window.innerHeight) <= 600;
+
+    const baseEnemyRadius = (isPhoneLayout ? 7.6 : 8) * sizeScale;
+    // Careful speed ramp: small increase per level with low per-enemy variance.
+    // Keep early levels close to the old average (~1.5), and ramp gently.
+    const baseSpeed = Math.min(2.1, 1.35 + level * 0.015);
+    const spawnIntervalMs = clampInt(520 - level * 6, 240, 520);
+
+    const spawnOneEnemy = (color) => {
+      // Skewed size distribution: most are near-normal, some are big, huge ones are rare.
+      // (Bigger ones also move a bit slower.)
+      const roll = Math.random();
+      let sizeFactor;
+      if (roll < 0.02) {
+        // Huge (rare)
+        sizeFactor = 1.75 + Math.random() * 0.60;
+      } else if (roll < 0.12) {
+        // Big (uncommon)
+        sizeFactor = 1.25 + Math.random() * 0.50;
+      } else {
+        // Normal (common)
+        sizeFactor = 0.90 + Math.random() * 0.25;
+      }
+
+      const radius = baseEnemyRadius * sizeFactor;
+      const { x, y } = getNonOverlappingSpawn(radius);
       const wobblePhase = Math.random() * Math.PI * 2;
+
+      const perEnemyVariance = 0.97 + Math.random() * 0.06;
+      const bigSlowdown = 1 / Math.pow(sizeFactor, 0.35);
+      const speed = baseSpeed * perEnemyVariance * bigSlowdown;
+
+      // Gooey shape variety: different node counts, breathing, squish, and slight asymmetry.
+      const isHuge = sizeFactor >= 1.75;
+      const isBig = sizeFactor >= 1.25;
+      const blobNodesCount = isHuge
+        ? 22 + Math.floor(Math.random() * 5)
+        : isBig
+          ? 19 + Math.floor(Math.random() * 5)
+          : 16 + Math.floor(Math.random() * 6);
+      const blobNoiseScale = isHuge ? 0.78 + Math.random() * 0.10 : isBig ? 0.90 + Math.random() * 0.15 : 1.0 + Math.random() * 0.25;
+      const blobSquishScale = isHuge ? 0.75 + Math.random() * 0.10 : isBig ? 0.85 + Math.random() * 0.15 : 0.95 + Math.random() * 0.20;
+      const blobBiasMag = isHuge ? 0.04 + Math.random() * 0.04 : 0.06 + Math.random() * 0.06;
+      const blobBiasAngle = Math.random() * Math.PI * 2;
+      const blobNoiseMulA = 2.0 + Math.random() * 1.2;
+      const blobNoiseMulB = 3.4 + Math.random() * 1.8;
+      const blobNoiseTimeA = 300 + Math.random() * 180;
+      const blobNoiseTimeB = 160 + Math.random() * 130;
+
       enemies.push({
         x,
         y,
@@ -681,21 +774,84 @@ export function createGame(ui) {
         prevY: y,
         vx: 0,
         vy: 0,
-        radius: 8 * sizeScale,
+        radius,
         color,
         speed,
         wobblePhase,
         blobSeed: Math.random() * 1000,
+        blobNodesCount,
+        blobNoiseScale,
+        blobNoiseMulA,
+        blobNoiseMulB,
+        blobNoiseTimeA,
+        blobNoiseTimeB,
+        blobBiasMag,
+        blobBiasAngle,
+        blobSquishScale,
         blobNodes: null,
         blobLastMs: 0,
       });
+    };
+
+    const pickSpawnColor = () => {
+      // Weighted toward earlier colors so progress doesn't stall early.
+      const weighted = [];
+      for (let i = 0; i < palette.length; i++) {
+        const c = palette[i];
+        const k = pendingByColor[c] || 0;
+        if (k <= 0) continue;
+        const w = Math.max(1, palette.length - i);
+        for (let n = 0; n < w; n++) weighted.push(c);
+      }
+      if (weighted.length === 0) return null;
+      return weighted[Math.floor(Math.random() * weighted.length)];
+    };
+
+    // Spawn a small initial burst so the level never starts empty.
+    const initialBurst = clampInt(4 + Math.floor(level / 10), 4, 8);
+    const nowMs = performance.now();
+    for (let i = 0; i < Math.min(initialBurst, enemyCount); i++) {
+      const c = pickSpawnColor() || palette[0];
+      spawnOneEnemy(c);
+      pendingByColor[c]--;
     }
 
-    const distinctColors = [...new Set(enemies.map((e) => e.color))];
-    distinctColors.sort((c1, c2) => COLOR_ORDER.indexOf(c1) - COLOR_ORDER.indexOf(c2));
+    const pendingTotal = Object.values(pendingByColor).reduce((a, b) => a + b, 0);
+    levelSpawn = {
+      pendingTotal,
+      pendingByColor,
+      palette,
+      spawnIntervalMs,
+      nextSpawnAtMs: nowMs + spawnIntervalMs,
+      spawnOneEnemy,
+      pickSpawnColor,
+    };
 
-    levelColors = distinctColors;
-    levelNextColorIndex = 0;
+    // If the first target color isn't currently present (rare but possible), advance to the next available.
+    advanceNextColorIfCleared();
+  }
+
+  function updateSpawnTrickle(nowMs) {
+    if (!levelSpawn) return;
+    if (levelSpawn.pendingTotal <= 0) return;
+    if (nowMs < levelSpawn.nextSpawnAtMs) return;
+
+    const c = levelSpawn.pickSpawnColor();
+    if (!c) {
+      levelSpawn.pendingTotal = 0;
+      return;
+    }
+
+    levelSpawn.spawnOneEnemy(c);
+    levelSpawn.pendingByColor[c] = Math.max(0, (levelSpawn.pendingByColor[c] || 0) - 1);
+    levelSpawn.pendingTotal = Math.max(0, levelSpawn.pendingTotal - 1);
+
+    // Slight jitter so the cadence feels organic.
+    const jitter = 0.85 + Math.random() * 0.30;
+    levelSpawn.nextSpawnAtMs = nowMs + levelSpawn.spawnIntervalMs * jitter;
+
+    // If we just spawned the last of a color, it may allow the target to advance later.
+    advanceNextColorIfCleared();
   }
 
   function separateEnemies() {
@@ -1028,10 +1184,17 @@ export function createGame(ui) {
     saveCash(cash);
     cashDirty = false;
 
-    showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, unlocked });
+    showGameOver(ui, {
+      timeSeconds,
+      level,
+      cashEarned,
+      bonusCash,
+      unlocked,
+      maxStartLevel: maxStartLevelUnlocked,
+    });
   }
 
-  function resetRun() {
+  function resetRun(startLevel = 1) {
     gameOver = false;
     hideGameOver(ui);
 
@@ -1047,7 +1210,7 @@ export function createGame(ui) {
     powerUps = [];
     activePowerUps = [];
 
-    level = 1;
+    level = Math.max(1, Math.floor(startLevel));
     trophyEffects = computeTrophyEffects();
     player.lives = clamp(3 + trophyEffects.startLives, 1, maxLives);
     player.invulnerableUntil = 0;
@@ -1247,6 +1410,9 @@ export function createGame(ui) {
     // Camera follows after player moves
     updateCamera();
 
+    // Level spawn trickle (spawns arrive over time)
+    updateSpawnTrickle(nowMs);
+
     // Bullets
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
@@ -1431,9 +1597,10 @@ export function createGame(ui) {
       if (removed) continue;
     }
 
-    // All enemies cleared
-    if (enemies.length === 0) {
+    // All enemies cleared (including any pending trickle spawns)
+    if (enemies.length === 0 && (!levelSpawn || levelSpawn.pendingTotal <= 0)) {
       level++;
+      maybeUnlockCheckpoint(level);
       showCenterMessage(ui.levelUpMessage, `LEVEL ${level}`, 850);
       spawnEnemiesForLevel();
     }
@@ -1554,7 +1721,18 @@ export function createGame(ui) {
       }
     });
 
-    ui.tryAgainBtn?.addEventListener('click', resetRun);
+    ui.tryAgainBtn?.addEventListener('click', () => resetRun(1));
+
+    ui.checkpointRow?.addEventListener('click', (e) => {
+      const btn = e.target?.closest?.('button[data-start-level]');
+      if (!btn) return;
+      const lv = Number(btn.dataset.startLevel);
+      if (!Number.isFinite(lv)) return;
+      // Only allow unlocked checkpoints.
+      if (lv < 10 || lv > maxStartLevelUnlocked) return;
+      nextRunStartLevel = lv;
+      resetRun(nextRunStartLevel);
+    });
 
     ui.pauseBtn?.addEventListener('click', togglePause);
 
@@ -1750,7 +1928,7 @@ export function createGame(ui) {
     installJoystick(ui.moveStick, ui.moveKnob, axes.move);
     installJoystick(ui.aimStick, ui.aimKnob, axes.aim);
 
-    resetRun();
+    resetRun(1);
     requestLoop();
   }
 

@@ -151,3 +151,14 @@ export function loadMouseAimEnabled() {
 export function saveMouseAimEnabled(enabled) {
   localStorage.setItem(STORAGE_KEYS.mouseAim, enabled ? 'true' : 'false');
 }
+
+export function loadMaxStartLevel() {
+  const v = localStorage.getItem(STORAGE_KEYS.maxStartLevel);
+  const n = typeof v === 'string' ? Number(v) : 0;
+  return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+}
+
+export function saveMaxStartLevel(level) {
+  const n = Number.isFinite(level) ? Math.max(0, Math.floor(level)) : 0;
+  localStorage.setItem(STORAGE_KEYS.maxStartLevel, String(n));
+}

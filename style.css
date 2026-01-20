@@ -495,6 +495,35 @@ html, body {
     text-align: center;
     display: none; /* hidden by default */
   }
+
+  .checkpointRow {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 10px;
+  }
+  .checkpointRow:empty { display: none; }
+
+  .checkpointRow .checkpointLabel {
+    width: 100%;
+    text-align: center;
+    opacity: 0.85;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+
+  .checkpointRow .checkpointBtn {
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.08);
+    color: rgba(234,255,255,0.95);
+    font-weight: 850;
+    cursor: pointer;
+  }
+  .checkpointRow .checkpointBtn:hover { border-color: rgba(0,255,255,0.25); background: rgba(0,255,255,0.10); }
+  .checkpointRow .checkpointBtn:active { transform: translateY(1px); }
   
   #gameOverScreen h1 {
     margin: 0 0 10px;
@@ -739,6 +768,9 @@ html, body {
 
     #activeOverlay { font-size: 14px; }
     #ultTopBtn { padding: 10px 12px; font-size: 13px; }
+
+    /* Level-up toast: slightly smaller on phones to avoid wrapping */
+    #levelUpMessage { font-size: 2.4rem; }
   }
 
   @media (hover:none){
@@ -772,6 +804,9 @@ html, body {
     font-size: 3rem;
     color: #0ff;
     text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+    white-space: nowrap;
+    max-width: min(92vw, 720px);
+    text-align: center;
     opacity: 0;
     transition: opacity 0.5s ease;
     pointer-events: none;

@@ -21,7 +21,7 @@ export function colorToRGBA(col, alpha) {
 }
 
 export function initEnemyBlob(e) {
-  const nodes = 18;
+  const nodes = Number.isFinite(e.blobNodesCount) ? Math.max(10, Math.min(28, Math.floor(e.blobNodesCount))) : 18;
   const out = [];
   for (let i = 0; i < nodes; i++) {
     const a = (i / nodes) * Math.PI * 2;
@@ -32,7 +32,8 @@ export function initEnemyBlob(e) {
 }
 
 export function updateEnemyBlob(e, nowMs) {
-  if (!e.blobNodes) initEnemyBlob(e);
+  const desiredNodes = Number.isFinite(e.blobNodesCount) ? Math.max(10, Math.min(28, Math.floor(e.blobNodesCount))) : 18;
+  if (!e.blobNodes || e.blobNodes.length !== desiredNodes) initEnemyBlob(e);
 
   const dtFrames = clamp((nowMs - (e.blobLastMs || nowMs)) / 16.67, 0.5, 2.0);
   e.blobLastMs = nowMs;
@@ -48,7 +49,18 @@ export function updateEnemyBlob(e, nowMs) {
   const uy = vy * inv;
 
   // Squish amount scales with movement; make it obvious.
-  const squish = clamp(velMag * 2.2, 0, r0 * 0.45);
+  const squishScale = Number.isFinite(e.blobSquishScale) ? clamp(e.blobSquishScale, 0.5, 1.25) : 1;
+  const squish = clamp(velMag * 2.2 * squishScale, 0, r0 * 0.45);
+
+  // Static asymmetry makes blobs feel like distinct "creatures".
+  const biasAngle = Number.isFinite(e.blobBiasAngle) ? e.blobBiasAngle : 0;
+  const biasMag = Number.isFinite(e.blobBiasMag) ? clamp(e.blobBiasMag, 0, 0.14) : 0;
+
+  const noiseScale = Number.isFinite(e.blobNoiseScale) ? clamp(e.blobNoiseScale, 0.65, 1.35) : 1;
+  const noiseMulA = Number.isFinite(e.blobNoiseMulA) ? clamp(e.blobNoiseMulA, 1.6, 3.6) : 2.4;
+  const noiseMulB = Number.isFinite(e.blobNoiseMulB) ? clamp(e.blobNoiseMulB, 3.2, 6.0) : 4.2;
+  const noiseTimeA = Number.isFinite(e.blobNoiseTimeA) ? clamp(e.blobNoiseTimeA, 240, 520) : 340;
+  const noiseTimeB = Number.isFinite(e.blobNoiseTimeB) ? clamp(e.blobNoiseTimeB, 140, 340) : 190;
 
   const k = 0.22; // spring strength
   const damping = 0.72;
@@ -64,10 +76,12 @@ export function updateEnemyBlob(e, nowMs) {
 
     // Small breathing noise so it feels alive even when standing.
     const noise =
-      0.16 * Math.sin(nowMs / 340 + seed * 0.9 + n.a * 2.4) +
-      0.10 * Math.sin(nowMs / 190 + seed * 1.7 + n.a * 4.2);
+      noiseScale *
+      (0.16 * Math.sin(nowMs / noiseTimeA + seed * 0.9 + n.a * noiseMulA) +
+        0.10 * Math.sin(nowMs / noiseTimeB + seed * 1.7 + n.a * noiseMulB));
 
-    const target = clamp(r0 * (1 + noise) + stretch, r0 * 0.70, r0 * 1.38);
+    const asym = r0 * biasMag * Math.cos(n.a - biasAngle);
+    const target = clamp(r0 * (1 + noise) + asym + stretch, r0 * 0.70, r0 * 1.38);
     const accel = (target - n.r) * k;
     n.vr = n.vr * damping + accel * dtFrames;
     n.r += n.vr * dtFrames;
