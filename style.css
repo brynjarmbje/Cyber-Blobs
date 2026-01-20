@@ -1,0 +1,602 @@
+/* 
+  style.css: 
+  A fun, neon-like theme for your .io survival game
+*/
+
+/* Remove default margins/padding, use full viewport */
+html, body {
+    margin: 0;
+    padding: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+    background: #05070c; /* solid dark base (no distracting animation) */
+  }
+  
+  /* App layout */
+  #app { height: 100vh; display:grid; grid-template-rows:auto 1fr; }
+
+  #topBar {
+    display:grid;
+    grid-template-columns: 1.2fr 3fr 1fr;
+    gap:16px;
+    align-items:center;
+    padding: 14px 18px;
+    background: rgba(0,0,0,0.55);
+    border-bottom: 1px solid rgba(0,255,255,0.35);
+    backdrop-filter: blur(10px) saturate(140%);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .brandTitle { font-weight: 800; letter-spacing: 0.2px; color: #eaffff; text-shadow: 0 0 14px rgba(0,255,255,0.25); }
+  .brandSub { font-size: 12px; opacity: 0.8; color: #bfe9ff; }
+
+  .hudRow {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap: 10px 14px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.06);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+  }
+  .hudItem { display:flex; align-items:center; gap:8px; font-size: 13px; color:#e9ffff; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .hudItem .label { opacity: 0.7; font-size: 11px; letter-spacing: 0.8px; }
+  .hudItem.wide { flex: 1 1 240px; justify-content:center; }
+
+  /* Keep HUD width stable so values don't cause wrapping/jitter */
+  #hudLevel, #hudTime, #colorCash {
+    display: inline-block;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  #hudLevel { min-width: 2ch; }
+  #hudTime { min-width: 6ch; }
+  #colorCash { min-width: 4ch; }
+
+  .nextWrap { display:flex; align-items:center; gap:6px; }
+
+  #hudUlt {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(0,255,255,0.12);
+    border: 1px solid rgba(0,255,255,0.24);
+    color: #dfffff;
+    font-weight: 800;
+    letter-spacing: 0.4px;
+  }
+
+  .actions { display:flex; justify-content:flex-end; gap:10px; }
+  .miniBtn { pointer-events:auto; background: linear-gradient(135deg,#0ff,#2cf); border:none; color:#001; font-weight:800; padding:8px 12px; border-radius:12px; cursor:pointer; font-size:12px; box-shadow:0 10px 24px rgba(0,255,255,0.18); }
+  .miniBtn:hover { filter: brightness(1.05); }
+  .miniBtn:active { transform: translateY(1px); }
+  .button.small { padding:6px 10px; font-size:0.8rem; }
+  #activePowerups { font-weight:600; color:#fff; }
+  #livesContainer { display:flex; gap:4px; }
+  .heart { width:14px; height:14px; background:radial-gradient(circle at 30% 30%, #ff9bd8, #ff2f6e 60%); position:relative; transform:rotate(-45deg); animation:beat 1.4s ease-in-out infinite; }
+  .heart:before,.heart:after { content:""; position:absolute; width:14px; height:14px; background:radial-gradient(circle at 30% 30%, #ff9bd8, #ff2f6e 60%); border-radius:50%; }
+  .heart:before { top:-7px; left:0; }
+  .heart:after { left:7px; top:0; }
+  @keyframes beat { 0%,100% { transform:rotate(-45deg) scale(1);} 50% { transform:rotate(-45deg) scale(1.2);} }
+  .colorSwatch {
+    display:inline-block;
+    width:22px;
+    height:22px;
+    border-radius:999px;
+    vertical-align:middle;
+    border:2px solid rgba(255,255,255,0.6);
+    position:relative;
+    box-shadow:0 0 8px -2px #fff;
+    background: transparent;
+  }
+  .colorSwatch.pulse { animation:swatchPulse .6s ease; }
+    /* Game area */
+    #gameArea { position:relative; display:grid; place-items:center; padding: 0; }
+    #gameShell {
+      position:relative;
+      width: min(1200px, 96vw);
+      height: min(78vh, calc(100vh - 120px));
+      aspect-ratio: 4 / 3;
+    }
+
+    /* Lives (top-left) */
+    #livesOverlay {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      padding: 0;
+      pointer-events: none;
+      user-select: none;
+      z-index: 35;
+    }
+    #livesOverlay #livesContainer { display:flex; gap:6px; }
+    #livesOverlay .heart { width:16px; height:16px; }
+    #livesOverlay .heart:before, #livesOverlay .heart:after { width:16px; height:16px; }
+    #livesOverlay .heart:before { top:-8px; }
+    #livesOverlay .heart:after { left:8px; }
+
+    @keyframes lifeLostPulse {
+      0% { box-shadow: 0 0 0 rgba(255,0,90,0); border-color: rgba(255,255,255,0.10); }
+      30% { box-shadow: 0 0 26px rgba(255,0,90,0.55); border-color: rgba(255,0,90,0.55); transform: scale(1.04); }
+      100% { box-shadow: 0 0 0 rgba(255,0,90,0); border-color: rgba(255,255,255,0.10); transform: scale(1); }
+    }
+    #livesOverlay.lifeLost { animation: lifeLostPulse 320ms ease; }
+
+    /* Top-right in-game HUD: powerups + ultimate */
+    #topRightHud {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      z-index: 35;
+      pointer-events: none;
+    }
+
+    #activeOverlay {
+      position: static;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+      border: none;
+      color: rgba(234,255,255,0.95);
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 10px rgba(0,255,255,0.45),
+        0 0 18px rgba(0,255,255,0.22),
+        0 0 10px rgba(0,0,0,0.55);
+      user-select: none;
+      pointer-events: none;
+      max-width: min(46vw, 360px);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #activeOverlay:empty { display: none; }
+
+    /* Desktop ultimates (top-center in game area) */
+    #ultButtons {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      z-index: 35;
+    }
+
+    #laserTopBtn,
+    #nukeTopBtn {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(0,255,255,0.28);
+      color: #dfffff;
+      font-weight: 900;
+      letter-spacing: 0.8px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.30);
+      backdrop-filter: blur(10px);
+      cursor: pointer;
+      text-transform: uppercase;
+      white-space: pre-line;
+      text-align: center;
+      line-height: 1.05;
+    }
+
+    #laserTopBtn .ultMain,
+    #nukeTopBtn .ultMain {
+      display:block;
+      font-size: 13px;
+    }
+
+    #laserTopBtn .ultKey,
+    #nukeTopBtn .ultKey {
+      display:block;
+      margin-top: 2px;
+      font-size: 11px;
+      opacity: 0.85;
+      letter-spacing: 1.2px;
+    }
+    #laserTopBtn:active,
+    #nukeTopBtn:active { transform: translateY(1px); }
+
+    /* Default hidden until owned */
+    #laserTopBtn.hidden,
+    #nukeTopBtn.hidden,
+    #nukeBtn.hidden { display: none; }
+
+    /* Center toast used for powerup pickup callouts */
+    #centerToast {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.1rem;
+      font-weight: 900;
+      color: #eaffff;
+      text-shadow: 0 0 10px rgba(0,255,255,0.55), 0 0 22px rgba(0,255,255,0.28);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: 0.8px;
+    }
+
+    #centerToast.visible { opacity: 1; }
+
+    /* Flying pickup label that moves into the top-right */
+    .pickupFly {
+      position: absolute;
+      z-index: 40;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(1);
+      transform-origin: center;
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: rgba(234,255,255,0.95);
+      text-shadow: 0 0 10px rgba(0,255,255,0.55), 0 0 22px rgba(0,255,255,0.25);
+      letter-spacing: 0.8px;
+      pointer-events: none;
+      user-select: none;
+      opacity: 0.95;
+      transition: transform 260ms cubic-bezier(.2,.9,.15,1), opacity 260ms ease;
+      will-change: transform, opacity;
+    }
+    #gameCanvas {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      display:block;
+      touch-action: none;
+      background: transparent;
+      border: 2px solid rgba(255,255,255,0.12);
+      box-shadow: 0 18px 70px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08) inset;
+      border-radius: 20px;
+    }
+
+    #glCanvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      border-radius: 20px;
+      pointer-events: none;
+    }
+
+    #desktopControlsHint {
+      position:absolute;
+      left:50%;
+      bottom: 12px;
+      transform: translateX(-50%);
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.45);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: rgba(255,255,255,0.9);
+      font-size: 12px;
+      backdrop-filter: blur(10px);
+      pointer-events:none;
+      user-select:none;
+    }
+    #desktopControlsHint kbd {
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.18);
+      border-bottom-color: rgba(255,255,255,0.10);
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    #desktopControlsHint .hintDot { opacity: 0.6; }
+
+  @keyframes swatchPulse { 0% { transform:scale(0.4); opacity:0;} 60% { transform:scale(1.15); opacity:1;} 100% { transform:scale(1); opacity:1;} }
+  .colorName { margin-left:4px; }
+  
+  /* GAME OVER SCREEN */
+  #gameOverScreen {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 300px;
+    padding: 30px;
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #0ff; /* neon border color */
+    box-shadow: 0 0 10px #0ff;
+    border-radius: 10px;
+    text-align: center;
+    display: none; /* hidden by default */
+  }
+  
+  #gameOverScreen h1 {
+    margin: 0 0 10px;
+    font-size: 2em;
+    color: #0ff; /* neon text */
+    text-shadow: 0 0 10px #0ff;
+  }
+  
+  #gameOverScreen p {
+    color: #fff;
+    margin-bottom: 20px;
+    white-space: pre-line;
+  }
+  
+  .button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #0ff;
+    color: #000;
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    border: 2px solid #fff;
+    transition: 0.2s;
+  }
+  
+  /* Hover or focus states for the button */
+  .button:hover,
+  .button:focus {
+    color: #fff;
+    background: #00a3a3; 
+    border-color: #0ff;
+    box-shadow: 0 0 10px #0ff;
+  }
+  
+  /* An optional glowing animation for the Try Again button */
+  .button {
+    animation: glowButton 1.5s ease-in-out infinite alternate;
+  }
+  
+  @keyframes glowButton {
+    0% {
+      box-shadow: 0 0 5px #0ff;
+    }
+    100% {
+      box-shadow: 0 0 20px #0ff;
+    }
+  }
+  
+  /* Shake animation for the container */
+@keyframes shakeAnim {
+    0% { transform: translate(0, 0); }
+    20% { transform: translate(-5px, 0); }
+    40% { transform: translate(5px, 0); }
+    60% { transform: translate(-5px, 0); }
+    80% { transform: translate(5px, 0); }
+    100% { transform: translate(0, 0); }
+  }
+  
+  .shake {
+    animation: shakeAnim 0.3s ease;
+  }
+  
+  /* Full-size overlay for flashes (matches the canvas box) */
+  #flashOverlay { position:absolute; inset:0; background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.9), rgba(255,255,255,0)); opacity:0; pointer-events:none; mix-blend-mode:screen; border-radius:20px; }
+
+  /* Touch Controls (joysticks) */
+  #touchControls {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 16px;
+    display:none;
+    justify-content: space-between;
+    gap: 12px;
+    pointer-events:none;
+    z-index: 60;
+  }
+
+  #touchUltStack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    pointer-events: none;
+  }
+  #touchUltStack .ultBtn { pointer-events: auto; }
+  .ultBtn--nuke { border-color: rgba(255,255,255,0.22); }
+
+  .ultBtn {
+    pointer-events:auto;
+    align-self:center;
+    height: 64px;
+    min-width: 76px;
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(0,0,0,0.55);
+    color: #eaffff;
+    font-weight: 900;
+    letter-spacing: 0.8px;
+    box-shadow: 0 18px 36px rgba(0,0,0,0.35);
+    backdrop-filter: blur(10px);
+    white-space: pre-line;
+    text-align: center;
+    line-height: 1.05;
+  }
+
+  .ultBtn .ultMain {
+    display:block;
+    font-size: 14px;
+  }
+
+  .ultBtn .ultKey {
+    display:block;
+    margin-top: 2px;
+    font-size: 11px;
+    opacity: 0.85;
+    letter-spacing: 1.2px;
+  }
+  .ultBtn:active { transform: scale(0.98); }
+  .joystick {
+    width: 140px;
+    height: 140px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.14);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.35);
+    backdrop-filter: blur(10px);
+    position: relative;
+    pointer-events:auto;
+    touch-action: none;
+  }
+  .joystick .knob {
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: linear-gradient(135deg,#0ff,#2cf);
+    box-shadow: 0 12px 30px rgba(0,255,255,0.25);
+    position:absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  /* Modals */
+  .modal { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; z-index:200; }
+  .modal.hidden { display:none; }
+  .modalContent { background:rgba(0,0,0,0.85); border:2px solid #0ff; padding:24px 28px; border-radius:18px; width: min(480px,90%); max-height:80vh; overflow:auto; box-shadow:0 0 20px #0ff; }
+  .modalContent h2 { margin-top:0; color:#0ff; text-shadow:0 0 10px #0ff; }
+  .modalContent { color: rgba(234,255,255,0.95); }
+  .modalContent p { color: rgba(234,255,255,0.9); }
+  .modalContent ol, .modalContent ul { color: rgba(234,255,255,0.95); }
+  .modalContent li { padding: 6px 0; }
+  .modalContent li.empty { opacity: 0.85; font-style: italic; }
+
+  .shopSection { margin: 10px 0 16px; padding: 12px 12px; border-radius: 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.10); }
+  .shopSectionTitle { font-weight: 900; color: #eaffff; margin-bottom: 8px; }
+  .ultSelect { display:flex; gap:10px; }
+  .miniBtn.isSelected { outline: 2px solid rgba(255,255,255,0.45); }
+  .shopHint { margin-top: 8px; font-size: 12px; opacity: 0.85; color: #cfefff; }
+
+  .boardSort { display:flex; gap:10px; justify-content:center; margin:8px 0 14px; }
+  .closeBtn { margin-top:14px; background:#0ff; color:#000; font-weight:700; border:none; padding:8px 16px; border-radius:10px; cursor:pointer; }
+  .closeBtn:hover { background:#07b3b3; color:#fff; }
+  .trophyGrid { display:grid; gap:14px; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); margin-top:12px; }
+  .trophyCard { background:linear-gradient(135deg,#202d33,#111); border:1px solid #0ff; border-radius:14px; padding:10px; position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; box-shadow:0 0 12px -2px #0ff; }
+  .trophyCard.locked { filter:grayscale(0.75) brightness(0.6); }
+
+  .trophyIcon { width:64px; height:64px; border-radius:14px; display:grid; place-items:center; font-weight:900; font-size:28px; color:#001; box-shadow:0 0 8px #0ff; user-select:none; }
+  .trophyIcon--spark { background:linear-gradient(135deg,#00ffff,#1a5cff); }
+  .trophyIcon--prism { background:linear-gradient(135deg,#ff4dff,#8a2be2); }
+  .trophyIcon--nova { background:linear-gradient(135deg,#ffe600,#ff6a00); }
+  .trophyCard .name { color: rgba(234,255,255,0.95); font-weight: 900; text-align:center; }
+  .trophyCard .desc { color: rgba(207,239,255,0.9); font-size: 11px; text-align:center; line-height: 1.2; }
+  .trophyCard button { background:#0ff; border:none; color:#000; font-weight:600; padding:4px 8px; border-radius:8px; cursor:pointer; font-size:12px; }
+  .trophyCard button:disabled { opacity:.4; cursor:not-allowed; }
+  .price { font-size:11px; opacity:.8; }
+  .ownedTag { position:absolute; top:6px; right:6px; background:#0ff; color:#000; font-size:10px; padding:2px 6px; border-radius:6px; font-weight:700; }
+  @media (max-width: 900px){
+    #topBar {
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        "brand actions"
+        "hud hud";
+      gap: 10px 12px;
+    }
+    #topBar .brand { grid-area: brand; }
+    #topBar .hudRow { grid-area: hud; }
+    #topBar .actions {
+      grid-area: actions;
+      justify-content: flex-end;
+      align-self: center;
+    }
+    .actions .miniBtn { padding: 8px 10px; font-size: 12px; }
+    .hudItem.wide { flex: 1 1 100%; }
+    #desktopControlsHint { display:none; }
+    #touchControls { display:flex; }
+    #ultButtons { display:none; }
+
+    /* Let the game area hug the top and fill the width.
+       This gives more breathing room for the fixed bottom controls. */
+    #gameArea { padding: 0; place-items: stretch; align-items: start; }
+    #gameShell {
+      width: 100vw;
+      height: calc(100vh - 260px);
+      aspect-ratio: auto;
+    }
+    #gameCanvas { border-radius: 0; }
+  }
+
+  @media (max-width: 600px){
+    #topBar { padding: 10px 12px; }
+    .brandTitle { font-size: 18px; }
+    .brandSub { font-size: 11px; }
+
+    .hudRow { padding: 8px 10px; border-radius: 16px; }
+    .hudItem { font-size: 12px; }
+    .hudItem .label { font-size: 10px; }
+
+    .actions .miniBtn { padding: 8px 10px; font-size: 12px; border-radius: 12px; }
+
+    /* Touch ultimate buttons (LASER/NUKE) smaller on phones */
+    #touchUltStack { gap: 8px; }
+    #touchUltStack .ultBtn { height: 54px; min-width: 66px; border-radius: 16px; }
+    #touchUltStack .ultBtn .ultMain { font-size: 12px; }
+    #touchUltStack .ultBtn .ultKey { font-size: 10px; }
+
+    #gameShell { height: min(76vh, calc(100vh - 230px)); }
+
+    #activeOverlay { font-size: 14px; }
+    #ultTopBtn { padding: 10px 12px; font-size: 13px; }
+  }
+
+  @media (hover:none){
+    #desktopControlsHint { display:none; }
+    #touchControls { display:flex; }
+    #ultButtons { display:none; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    html, body { animation:none; }
+    .button { animation:none; }
+    .heart { animation:none; }
+  }
+  
+  /* Flash animation using keyframes */
+  @keyframes flashAnim {
+    0%   { opacity: 0.8; }
+    50%  { opacity: 0;   }
+    100% { opacity: 0;   }
+  }
+  
+  #flashOverlay.active {
+    animation: flashAnim 0.3s forwards;
+  }
+  
+  /* "LEVEL UP!" message in the center of the canvas container */
+  #levelUpMessage {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    color: #0ff;
+    text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+  }
+  
+  /* When .visible, fade in quickly */
+  #levelUpMessage.visible {
+    opacity: 1;
+  }

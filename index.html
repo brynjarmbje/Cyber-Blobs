@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ColorSurvival.io (No-Stack Version)</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+  <header id="topBar">
+    <div class="brand">
+      <div class="brandTitle">ColorSurvival</div>
+      <div class="brandSub">Survive. Hit the NEXT enemy.</div>
+    </div>
+
+    <div class="hudRow" role="status" aria-label="Game HUD">
+      <div class="hudItem"><span class="label">LEVEL</span><span id="hudLevel">1</span></div>
+      <div class="hudItem"><span class="label">TIME</span><span id="hudTime">0.00</span></div>
+      <div class="hudItem">
+        <span class="label">NEXT</span>
+        <span class="nextWrap" id="hudNextColor">
+          <canvas class="colorSwatch" id="nextColorSwatch" width="22" height="22" aria-label="Next enemy"></canvas>
+        </span>
+      </div>
+      <div class="hudItem"><span class="label">CASH</span><span id="colorCash">0</span></div>
+    </div>
+
+    <div class="actions">
+      <button id="openShopBtn" class="miniBtn" type="button">SHOP</button>
+      <button id="openBoardBtn" class="miniBtn" type="button">SCORES</button>
+    </div>
+  </header>
+
+  <main id="gameArea" aria-label="Game">
+    <div id="gameShell">
+      <canvas id="glCanvas" width="800" height="600" aria-hidden="true"></canvas>
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+      <div id="livesOverlay" aria-label="Lives"><span id="livesContainer"></span></div>
+
+      <div id="ultButtons" aria-label="Ultimates">
+        <button id="laserTopBtn" class="hidden" type="button" aria-label="Activate laser">LASER</button>
+        <button id="nukeTopBtn" type="button" aria-label="Activate nuke">NUKE</button>
+      </div>
+
+      <div id="topRightHud" aria-label="Active powerups" role="status">
+        <div id="activeOverlay" aria-live="polite"></div>
+      </div>
+
+      <div id="centerToast" aria-hidden="true"></div>
+
+      <div id="levelUpMessage">LEVEL UP!</div>
+      <div id="flashOverlay"></div>
+
+      <div id="desktopControlsHint" aria-hidden="true">
+        <span class="hintGroup">Move <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Turn <kbd>Z</kbd> / <kbd>X</kbd></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Laser <kbd>SPACE</kbd> • Nuke <kbd>SHIFT</kbd></span>
+      </div>
+    </div>
+
+    <!-- Touch Controls (Tablet/Phone) -->
+    <div id="touchControls" aria-label="Touch controls">
+      <div class="joystick" id="moveStick" aria-label="Move joystick">
+        <div class="knob" id="moveKnob"></div>
+      </div>
+      <div id="touchUltStack" aria-label="Ultimates">
+        <button id="ultBtn" class="ultBtn hidden" type="button" aria-label="Activate laser">LASER</button>
+        <button id="nukeBtn" class="ultBtn ultBtn--nuke" type="button" aria-label="Activate nuke">NUKE</button>
+      </div>
+      <div class="joystick" id="aimStick" aria-label="Aim joystick">
+        <div class="knob" id="aimKnob"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="gameOverScreen">
+  <h1>Game Over!</h1>
+  <p id="stats"></p>
+  <div class="button" id="tryAgainBtn">Try Again</div>
+  <div style="margin-top:12px;">
+    <button class="button small" id="goShopFromOver">Shop</button>
+    <button class="button small" id="goScoresFromOver">Scores</button>
+  </div>
+</div>
+
+<!-- Shop Modal -->
+<div id="shopModal" class="modal hidden">
+  <div class="modalContent">
+    <h2>Color Shop</h2>
+    <p>Color Cash: <span id="shopCash">0</span></p>
+
+    <div class="shopSection">
+      <div class="shopSectionTitle">Ultimates</div>
+      <div class="ultSelect" role="group" aria-label="Ultimate purchases">
+        <button id="ultLaserBtn" class="miniBtn" type="button">BUY LASER (250 CC)</button>
+        <button id="ultNukeBtn" class="miniBtn" type="button">BUY NUKE (750 CC)</button>
+      </div>
+      <div class="shopHint">Laser cooldown: <strong>30s</strong>. Nuke cooldown: <strong>60s</strong>. Laser uses <strong>Space</strong>. Nuke uses <strong>Shift</strong>.</div>
+    </div>
+
+    <div id="trophyGrid" class="trophyGrid"></div>
+    <button class="closeBtn" id="closeShopBtn">Close</button>
+  </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div id="boardModal" class="modal hidden">
+  <div class="modalContent">
+    <h2>High Scores</h2>
+    <div class="boardSort" aria-label="Sort leaderboard">
+      <button id="sortTimeBtn" class="miniBtn" type="button">TIME</button>
+      <button id="sortLevelBtn" class="miniBtn" type="button">LEVEL</button>
+      <button id="sortCashBtn" class="miniBtn" type="button">CASH</button>
+    </div>
+    <ol id="scoreList"></ol>
+    <button class="closeBtn" id="closeBoardBtn">Close</button>
+  </div>
+</div>
+
+<!-- Import map required for Three.js example modules that import from "three" -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module" src="js/main.js"></script>
+
+</body>
+</html>

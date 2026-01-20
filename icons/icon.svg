@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="g" cx="35%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="18%" stop-color="#7de9ff" stop-opacity="0.95"/>
+      <stop offset="55%" stop-color="#2cc6ff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#001018" stop-opacity="1"/>
+    </radialGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feColorMatrix in="b" type="matrix"
+        values="1 0 0 0 0
+                0 1 0 0 0
+                0 0 1 0 0
+                0 0 0 0.9 0" result="c"/>
+      <feMerge>
+        <feMergeNode in="c"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="120" fill="#000000"/>
+
+  <!-- Planet -->
+  <g filter="url(#glow)">
+    <circle cx="256" cy="256" r="172" fill="url(#g)"/>
+    <path d="M118 252c38-42 92-64 152-64 62 0 120 24 166 70" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M154 318c34-22 72-33 112-33 58 0 112 24 156 70" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="14" stroke-linecap="round"/>
+
+    <!-- Tiny star / spark -->
+    <path d="M392 138l10 22 24 10-24 10-10 22-10-22-24-10 24-10z" fill="rgba(255,255,255,0.9)"/>
+  </g>
+
+  <!-- Maskable safe area hint: keep content centered -->
+</svg>
