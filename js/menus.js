@@ -92,10 +92,25 @@ export function installMenuBindings(
     onSettingsAimToggle,
   } = {}
 ) {
+  // When level select is opened from the Game Over screen, closing it should
+  // return to a sensible place (main menu) instead of leaving the game in limbo.
+  let levelSelectOpenedFromGameOver = false;
+
   ui.tryAgainBtn?.addEventListener('click', () => {
+    // Ensure the Game Over popup doesn't stay open behind level select.
+    if (ui?.gameOverScreen) {
+      ui.gameOverScreen.style.display = 'none';
+      ui.gameOverScreen.setAttribute('aria-hidden', 'true');
+    }
+
     const maxStart = typeof getMaxStartLevelUnlocked === 'function' ? getMaxStartLevelUnlocked() : 0;
-    if (maxStart >= 10 && typeof openLevelSelect === 'function') openLevelSelect({ allowBackToMenu: false });
-    else if (typeof startRunFromLevel === 'function') startRunFromLevel(1);
+    if (maxStart >= 10 && typeof openLevelSelect === 'function') {
+      levelSelectOpenedFromGameOver = true;
+      openLevelSelect({ allowBackToMenu: false });
+    } else if (typeof startRunFromLevel === 'function') {
+      levelSelectOpenedFromGameOver = false;
+      startRunFromLevel(1);
+    }
   });
 
   ui.goMainMenuBtn?.addEventListener('click', () => {
@@ -110,12 +125,18 @@ export function installMenuBindings(
 
     const maxStart = typeof getMaxStartLevelUnlocked === 'function' ? getMaxStartLevelUnlocked() : 0;
     if (lv !== 1 && (lv < 10 || lv > maxStart)) return;
+    levelSelectOpenedFromGameOver = false;
     if (typeof startRunFromLevel === 'function') startRunFromLevel(lv);
   });
 
   ui.closeLevelSelectBtn?.addEventListener('click', () => {
     if (typeof closeLevelSelect === 'function') closeLevelSelect();
     if (typeof isInMainMenu === 'function' && isInMainMenu()) return;
+
+    if (levelSelectOpenedFromGameOver) {
+      levelSelectOpenedFromGameOver = false;
+      if (typeof showMainMenu === 'function') showMainMenu();
+    }
   });
 
   ui.pauseBtn?.addEventListener('click', () => {
