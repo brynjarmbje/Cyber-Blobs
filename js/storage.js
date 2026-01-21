@@ -38,6 +38,42 @@ export function saveOwnedTrophies(owned) {
   localStorage.setItem(STORAGE_KEYS.trophies, JSON.stringify(Array.from(owned)));
 }
 
+function normalizeTrophyLevels(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (typeof k !== 'string' || k.length === 0) continue;
+    const n = Math.max(0, Math.floor(toFiniteNumber(v, 0)));
+    if (n > 0) out[k] = n;
+  }
+  return out;
+}
+
+export function loadTrophyLevels(ownedTrophies) {
+  const raw = safeParseJson(localStorage.getItem(STORAGE_KEYS.trophyLevels), null);
+  const levels = normalizeTrophyLevels(raw);
+
+  // Backward-compatible migration: previously we only stored owned trophy IDs.
+  if (ownedTrophies instanceof Set) {
+    for (const id of ownedTrophies) {
+      if (typeof id !== 'string') continue;
+      if (!levels[id]) levels[id] = 1;
+    }
+  }
+
+  // If the new schema wasn't present but we have legacy owned trophies, persist once.
+  if ((!raw || typeof raw !== 'object') && Object.keys(levels).length > 0) {
+    saveTrophyLevels(levels);
+  }
+
+  return levels;
+}
+
+export function saveTrophyLevels(levels) {
+  const normalized = normalizeTrophyLevels(levels);
+  localStorage.setItem(STORAGE_KEYS.trophyLevels, JSON.stringify(normalized));
+}
+
 function normalizeLeaderboardV2(raw) {
   if (!Array.isArray(raw)) return [];
   return raw
@@ -161,4 +197,19 @@ export function loadMaxStartLevel() {
 export function saveMaxStartLevel(level) {
   const n = Number.isFinite(level) ? Math.max(0, Math.floor(level)) : 0;
   localStorage.setItem(STORAGE_KEYS.maxStartLevel, String(n));
+}
+
+export function loadPlayerName() {
+  const v = localStorage.getItem(STORAGE_KEYS.playerName);
+  if (typeof v !== 'string') return '';
+  return v.trim();
+}
+
+export function savePlayerName(name) {
+  const v = typeof name === 'string' ? name.trim().slice(0, 16) : '';
+  if (v.length === 0) {
+    localStorage.removeItem(STORAGE_KEYS.playerName);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEYS.playerName, v);
 }

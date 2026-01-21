@@ -3,6 +3,15 @@ import { TROPHIES, POWERUP_TYPES } from './constants.js';
 
 export function getUiElements() {
   return {
+    // Main menu
+    mainMenu: document.getElementById('mainMenu'),
+    mainMenuMeta: document.getElementById('mainMenuMeta'),
+    mainPlayBtn: document.getElementById('mainPlayBtn'),
+    mainShopBtn: document.getElementById('mainShopBtn'),
+    mainBoardBtn: document.getElementById('mainBoardBtn'),
+    mainSettingsBtn: document.getElementById('mainSettingsBtn'),
+    mainAboutBtn: document.getElementById('mainAboutBtn'),
+
     // Canvas / containers
     gameShell: document.getElementById('gameShell'),
     canvas: document.getElementById('gameCanvas'),
@@ -12,7 +21,15 @@ export function getUiElements() {
     gameOverScreen: document.getElementById('gameOverScreen'),
     statsParagraph: document.getElementById('stats'),
     tryAgainBtn: document.getElementById('tryAgainBtn'),
-    checkpointRow: document.getElementById('checkpointRow'),
+    goMainMenuBtn: document.getElementById('goMainMenuBtn'),
+
+    // Pause screen + leave confirmation
+    pauseScreen: document.getElementById('pauseScreen'),
+    pauseSoundBtn: document.getElementById('pauseSoundBtn'),
+    resumeBtn: document.getElementById('resumeBtn'),
+    leaveGameBtn: document.getElementById('leaveGameBtn'),
+    confirmLeaveYesBtn: document.getElementById('confirmLeaveYesBtn'),
+    confirmLeaveNoBtn: document.getElementById('confirmLeaveNoBtn'),
 
     // HUD
     hudLevelEl: document.getElementById('hudLevel'),
@@ -36,9 +53,23 @@ export function getUiElements() {
     // Modals
     openShopBtn: document.getElementById('openShopBtn'),
     openBoardBtn: document.getElementById('openBoardBtn'),
+    openSettingsBtn: document.getElementById('openSettingsBtn'),
+    openAboutBtn: document.getElementById('openAboutBtn'),
     musicBtn: document.getElementById('musicBtn'),
     pauseBtn: document.getElementById('pauseBtn'),
     aimModeBtn: document.getElementById('aimModeBtn'),
+
+    levelSelectModal: document.getElementById('levelSelectModal'),
+    levelSelectGrid: document.getElementById('levelSelectGrid'),
+    closeLevelSelectBtn: document.getElementById('closeLevelSelectBtn'),
+
+    settingsModal: document.getElementById('settingsModal'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    playerNameInput: document.getElementById('playerNameInput'),
+    settingsAimBtn: document.getElementById('settingsAimBtn'),
+
+    aboutModal: document.getElementById('aboutModal'),
+    closeAboutBtn: document.getElementById('closeAboutBtn'),
 
     shopModal: document.getElementById('shopModal'),
     closeShopBtn: document.getElementById('closeShopBtn'),
@@ -52,14 +83,12 @@ export function getUiElements() {
     sortCashBtn: document.getElementById('sortCashBtn'),
     sortLevelBtn: document.getElementById('sortLevelBtn'),
 
-    goShopFromOver: document.getElementById('goShopFromOver'),
-    goScoresFromOver: document.getElementById('goScoresFromOver'),
-
     levelUpMessage: document.getElementById('levelUpMessage'),
       centerToast: document.getElementById('centerToast'),
       riftToast: document.getElementById('riftToast'),
     flashOverlay: document.getElementById('flashOverlay'),
     pauseOverlay: document.getElementById('pauseOverlay'),
+    startCountdownEl: document.getElementById('startCountdown'),
 
     // Controls
     desktopControlsHint: document.getElementById('desktopControlsHint'),
@@ -319,7 +348,7 @@ export function animatePickupToActive(ui, text) {
   anim.addEventListener('finish', () => el.remove(), { once: true });
 }
 
-export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, unlocked, maxStartLevel }) {
+export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, unlocked }) {
   if (!ui.gameOverScreen) return;
   ui.gameOverScreen.style.display = 'block';
 
@@ -332,27 +361,6 @@ export function showGameOver(ui, { timeSeconds, level, cashEarned, bonusCash, un
 
   if (ui.statsParagraph) {
     ui.statsParagraph.textContent = `You survived ${timeSeconds.toFixed(2)} seconds and reached Level ${level}.${extraText}`;
-  }
-
-  if (ui.checkpointRow) {
-    ui.checkpointRow.textContent = '';
-
-    const maxLv = Number.isFinite(maxStartLevel) ? Math.max(0, Math.floor(maxStartLevel)) : 0;
-    if (maxLv >= 10) {
-      const label = document.createElement('div');
-      label.className = 'checkpointLabel';
-      label.textContent = 'Start next run at:';
-      ui.checkpointRow.appendChild(label);
-
-      for (let lv = 10; lv <= maxLv; lv += 10) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'checkpointBtn';
-        btn.dataset.startLevel = String(lv);
-        btn.textContent = `Level ${lv}`;
-        ui.checkpointRow.appendChild(btn);
-      }
-    }
   }
 }
 
@@ -368,14 +376,26 @@ export function closeModal(modal) {
   modal?.classList.add('hidden');
 }
 
-export function renderShop(ui, ownedTrophies, cash, onBuy) {
+function getTrophyNextCost(basePrice, nextLevel) {
+  const lv = Math.max(1, Math.floor(nextLevel || 1));
+  return Math.max(1, Math.floor(basePrice * 2 ** (lv - 1)));
+}
+
+export function renderShop(ui, trophyLevels, cash, onBuyOrUpgrade) {
   if (!ui.trophyGrid) return;
 
   if (ui.shopCashEl) ui.shopCashEl.textContent = String(cash);
   ui.trophyGrid.innerHTML = '';
 
+  const levels = trophyLevels && typeof trophyLevels === 'object' ? trophyLevels : {};
+
   for (const t of TROPHIES) {
-    const owned = ownedTrophies.has(t.id);
+    const currentLevel = Math.max(0, Math.floor(Number(levels[t.id] || 0)));
+    const maxLevel = Math.max(1, Math.floor(Number(t.maxLevel || 1)));
+    const owned = currentLevel > 0;
+    const nextLevel = Math.min(maxLevel, currentLevel + 1);
+    const canUpgrade = currentLevel < maxLevel;
+    const nextCost = canUpgrade ? getTrophyNextCost(t.price, nextLevel) : 0;
 
     const card = document.createElement('div');
     card.className = 'trophyCard' + (owned ? ' owned' : '');
@@ -394,7 +414,9 @@ export function renderShop(ui, ownedTrophies, cash, onBuy) {
 
     const price = document.createElement('div');
     price.className = 'price';
-    price.textContent = `${t.price} CC`;
+    price.textContent = canUpgrade
+      ? `${owned ? 'Next' : 'Cost'}: ${nextCost} CC`
+      : `MAXED`;
 
     card.appendChild(icon);
     card.appendChild(name);
@@ -404,12 +426,15 @@ export function renderShop(ui, ownedTrophies, cash, onBuy) {
     if (owned) {
       const ownedTag = document.createElement('div');
       ownedTag.className = 'ownedTag';
-      ownedTag.textContent = 'OWNED';
+      ownedTag.textContent = currentLevel >= maxLevel ? `MAX ${maxLevel}` : `LVL ${currentLevel}/${maxLevel}`;
       card.appendChild(ownedTag);
-    } else {
+    }
+
+    if (canUpgrade) {
       const btn = document.createElement('button');
-      btn.textContent = 'BUY';
-      btn.addEventListener('click', () => onBuy(t));
+      btn.textContent = owned ? `UPGRADE (${nextCost} CC)` : `BUY (${nextCost} CC)`;
+      btn.disabled = cash < nextCost;
+      btn.addEventListener('click', () => onBuyOrUpgrade(t));
       card.appendChild(btn);
     }
 
@@ -431,18 +456,51 @@ export function renderScores(ui, leaderboard, sortBy) {
 
   const entries = [...leaderboard];
 
-  if (sortBy === 'cash') {
-    entries.sort((a, b) => b.cashEarned - a.cashEarned);
-  } else if (sortBy === 'level') {
-    entries.sort((a, b) => b.level - a.level);
-  } else {
-    // time (default): best time = highest seconds
-    entries.sort((a, b) => b.timeSeconds - a.timeSeconds);
-  }
+  // Sort buttons are removed; keep the leaderboard simple and consistent.
+  // Best run = highest time survived.
+  entries.sort((a, b) => b.timeSeconds - a.timeSeconds);
 
-  entries.slice(0, 10).forEach((e) => {
+  entries.slice(0, 10).forEach((e, idx) => {
     const li = document.createElement('li');
-    li.textContent = `${e.timeSeconds.toFixed(2)}s  |  L${e.level}  |  +${e.cashEarned} CC`;
+
+    li.className = 'scoreEntry';
+
+    const rank = document.createElement('div');
+    rank.className = 'scoreRank';
+    rank.textContent = `#${idx + 1}`;
+
+    const main = document.createElement('div');
+    main.className = 'scoreMain';
+
+    const time = document.createElement('div');
+    time.className = 'scoreTime';
+    time.textContent = `${e.timeSeconds.toFixed(2)}s survived`;
+
+    const meta = document.createElement('div');
+    meta.className = 'scoreMeta';
+    meta.textContent = `Level ${e.level}  •  +${e.cashEarned} CC`;
+
+    main.appendChild(time);
+    main.appendChild(meta);
+
+    if (typeof e.endedAt === 'string' && e.endedAt.length > 0) {
+      const d = new Date(e.endedAt);
+      if (!Number.isNaN(d.getTime())) {
+        const date = document.createElement('div');
+        date.className = 'scoreDate';
+        date.textContent = d.toLocaleString(undefined, {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        main.appendChild(date);
+      }
+    }
+
+    li.appendChild(rank);
+    li.appendChild(main);
     ui.scoreList.appendChild(li);
   });
 }

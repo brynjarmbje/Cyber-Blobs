@@ -27,6 +27,7 @@ export function initMusic(ui, opts = {}) {
 // Dual-track music system:
 // - Plays gameplay music when context === 'game'
 // - Plays menu music when context === 'menu'
+// - Plays game over music when context === 'over' (optional)
 // - Stops all when context === 'off'
 // Also supports random "stingers" fired exactly when a loop restarts.
 export function initMusicSystem(ui, opts = {}) {
@@ -35,12 +36,14 @@ export function initMusicSystem(ui, opts = {}) {
 
   const gameSrc = opts.gameSrc || './CyberBlob-Theme_V1.mp3';
   const menuSrc = typeof opts.menuSrc === 'string' ? opts.menuSrc : './CyberBlob-Menu-Theme.mp3';
+  const overSrc = typeof opts.overSrc === 'string' ? opts.overSrc : null;
   const stingers = Array.isArray(opts.stingers)
     ? opts.stingers
     : ['./CyberBlob-drum1.mp3', './CyberBlob-whine1.mp3'];
 
   const volumeGame = clampNumber(opts.volumeGame ?? 0.35, 0, 1);
   const volumeMenu = clampNumber(opts.volumeMenu ?? 0.30, 0, 1);
+  const volumeOver = clampNumber(opts.volumeOver ?? 0.32, 0, 1);
   const stingerVolume = clampNumber(opts.stingerVolume ?? 0.55, 0, 1);
 
   // Stinger frequency controls (stingers are *extras*):
@@ -55,13 +58,14 @@ export function initMusicSystem(ui, opts = {}) {
   const trimSilence = opts.trimSilence !== false;
 
   let enabled = initialEnabled;
-  let context = opts.context === 'menu' || opts.context === 'off' ? opts.context : 'game';
+  let context = opts.context === 'menu' || opts.context === 'over' || opts.context === 'off' ? opts.context : 'game';
 
   /** @type {AudioContext|null} */
   let audioCtx = null;
 
   const game = createMusicTrack(gameSrc, volumeGame, { preferWebAudio, trimSilence });
   const menu = menuSrc ? createMusicTrack(menuSrc, volumeMenu, { preferWebAudio, trimSilence }) : null;
+  const over = overSrc ? createMusicTrack(overSrc, volumeOver, { preferWebAudio, trimSilence }) : null;
   const stingerPool = createStingerPool(stingers, stingerVolume);
 
   let wasPlayingBeforeHide = false;
@@ -71,6 +75,7 @@ export function initMusicSystem(ui, opts = {}) {
   function activeTrack() {
     if (context === 'game') return game;
     if (context === 'menu') return menu || game;
+    if (context === 'over') return over || menu || game;
     return null;
   }
 
@@ -90,6 +95,7 @@ export function initMusicSystem(ui, opts = {}) {
   function pauseAll() {
     game.pause();
     if (menu) menu.pause();
+    if (over) over.pause();
   }
 
   function pickRandom(arr) {
@@ -197,6 +203,10 @@ export function initMusicSystem(ui, opts = {}) {
         menu.unlocked = true;
         results.push(true);
       }
+      if (over) {
+        over.unlocked = true;
+        results.push(true);
+      }
     } else {
       results.push(await unlockAudioElement(game.audio));
       if (results[results.length - 1]) game.unlocked = true;
@@ -204,6 +214,11 @@ export function initMusicSystem(ui, opts = {}) {
       if (menu) {
         results.push(await unlockAudioElement(menu.audio));
         if (results[results.length - 1]) menu.unlocked = true;
+      }
+
+      if (over) {
+        results.push(await unlockAudioElement(over.audio));
+        if (results[results.length - 1]) over.unlocked = true;
       }
     }
 
@@ -222,6 +237,7 @@ export function initMusicSystem(ui, opts = {}) {
     // Stop the other track so we never overlap.
     if (track !== game) game.pause();
     if (menu && track !== menu) menu.pause();
+    if (over && track !== over) over.pause();
 
     const wasStarted = track.hasStarted === true;
 
@@ -235,6 +251,7 @@ export function initMusicSystem(ui, opts = {}) {
           if (!enabled) return;
           if (track === game && context !== 'game') return;
           if (track === menu && context !== 'menu') return;
+          if (track === over && context !== 'over') return;
           playStinger(track === game ? 'game' : 'menu');
         },
       });
@@ -302,7 +319,8 @@ export function initMusicSystem(ui, opts = {}) {
   }
 
   function setContext(nextContext) {
-    const next = nextContext === 'menu' || nextContext === 'off' ? nextContext : 'game';
+    const next =
+      nextContext === 'menu' || nextContext === 'over' || nextContext === 'off' ? nextContext : 'game';
     if (context === next) return;
     context = next;
 
@@ -359,7 +377,7 @@ export function initMusicSystem(ui, opts = {}) {
 
     // Resume same context without forcing a restart.
     if (wasPlayingBeforeHide) {
-      const t = (hiddenContext === 'game' ? game : (menu || game));
+      const t = hiddenContext === 'game' ? game : hiddenContext === 'over' ? (over || menu || game) : (menu || game);
       if (canAutoplay(t)) void ensurePlaying(t, { restart: false });
       else addGestureListeners();
     }
@@ -370,6 +388,7 @@ export function initMusicSystem(ui, opts = {}) {
   // Preload so the first play after gesture is fast.
   void game.audio.load?.();
   void menu?.audio.load?.();
+  void over?.audio.load?.();
   for (const s of stingerPool) void s.audio.load?.();
   if (enabled && !canAutoplay(activeTrack()) && context !== 'off') addGestureListeners();
 
@@ -385,6 +404,7 @@ export function initMusicSystem(ui, opts = {}) {
     _debug: {
       gameAudio: game.audio,
       menuAudio: menu?.audio || null,
+      overAudio: over?.audio || null,
       stingers: stingerPool.map((s) => s.audio),
     },
   };

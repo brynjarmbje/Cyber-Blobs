@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>ColorSurvival.io (No-Stack Version)</title>
+  <title>Cyber Yolks</title>
   <meta name="theme-color" content="#000000">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,11 +13,48 @@
 </head>
 <body>
 
+<!-- Main Menu (mobile-first) -->
+<section id="mainMenu" class="mainMenu" aria-label="Main menu">
+  <div class="mainMenuStars" aria-hidden="true"></div>
+  <div class="mainMenuCard" role="presentation">
+    <h1 class="mainMenuTitle" aria-label="Cyber Yolks">
+      <span class="t1">CYBER</span>
+      <span class="t2">YOLKS</span>
+    </h1>
+    <div class="mainMenuTag">Survive.</div>
+
+    <div class="mainMenuActions" role="group" aria-label="Main menu actions">
+      <button id="mainPlayBtn" class="mainMenuBtn mainMenuBtn--play" type="button">
+        <span class="mmIcon" aria-hidden="true"></span>
+        <span class="mmText">PLAY</span>
+      </button>
+      <button id="mainShopBtn" class="mainMenuBtn mainMenuBtn--shop" type="button">
+        <span class="mmIcon" aria-hidden="true"></span>
+        <span class="mmText">SHOP</span>
+      </button>
+      <button id="mainBoardBtn" class="mainMenuBtn mainMenuBtn--board" type="button">
+        <span class="mmIcon" aria-hidden="true"></span>
+        <span class="mmText">LEADERBOARD</span>
+      </button>
+      <button id="mainSettingsBtn" class="mainMenuBtn mainMenuBtn--settings" type="button">
+        <span class="mmIcon" aria-hidden="true"></span>
+        <span class="mmText">SETTINGS</span>
+      </button>
+      <button id="mainAboutBtn" class="mainMenuBtn mainMenuBtn--about" type="button">
+        <span class="mmIcon" aria-hidden="true"></span>
+        <span class="mmText">ABOUT</span>
+      </button>
+    </div>
+
+    <div id="mainMenuMeta" class="mainMenuMeta">v1.0.0 BETA</div>
+  </div>
+</section>
+
 <div id="app">
   <header id="topBar">
     <div class="brand">
-      <div class="brandTitle">ColorSurvival</div>
-      <div class="brandSub">Survive. Hit the target enemy.</div>
+      <div class="brandTitle">Cyber Yolks</div>
+      <div class="brandSub">Survive.</div>
     </div>
 
     <div class="hudRow" role="status" aria-label="Game HUD">
@@ -33,15 +70,7 @@
     </div>
 
     <div class="actions">
-      <details class="menu" id="menu">
-        <summary class="iconBtn iconBtn--menu" aria-label="Menu" title="Menu"></summary>
-        <div class="menuPanel" role="menu" aria-label="Menu">
-          <button id="openShopBtn" class="menuItem" type="button" role="menuitem">Shop</button>
-          <button id="openBoardBtn" class="menuItem" type="button" role="menuitem">Scores</button>
-          <button id="musicBtn" class="menuItem" type="button" role="menuitem" aria-pressed="true">MUSIC ON</button>
-        </div>
-      </details>
-      <button id="pauseBtn" class="iconBtn iconBtn--pause" type="button" aria-pressed="false" aria-label="Pause" title="Pause"></button>
+      <button id="pauseBtn" class="topBarPauseBtn" type="button" aria-pressed="false" aria-label="Pause" title="Pause (P / ESC)">PAUSE</button>
     </div>
   </header>
 
@@ -51,6 +80,7 @@
       <canvas id="gameCanvas" width="800" height="600"></canvas>
 
       <div id="pauseOverlay" aria-hidden="true">PAUSED</div>
+      <div id="startCountdown" class="startCountdown hidden" aria-hidden="true"></div>
 
       <div id="livesOverlay" aria-label="Lives"><span id="livesContainer"></span></div>
 
@@ -96,28 +126,112 @@
   </main>
 </div>
 
-<div id="gameOverScreen">
+<div id="gameOverScreen" class="menuModalContent gameOverScreen" aria-hidden="true" role="dialog" aria-label="Game over">
   <h1>Game Over!</h1>
   <p id="stats"></p>
-  <button class="button" id="tryAgainBtn" type="button">Try Again</button>
-  <div id="checkpointRow" class="checkpointRow" aria-label="Start from checkpoint"></div>
-  <div style="margin-top:12px;">
-    <button class="button small" id="goShopFromOver">Shop</button>
-    <button class="button small" id="goScoresFromOver">Scores</button>
+  <div class="gameOverActions" role="group" aria-label="Game over actions">
+    <button class="mainMenuBtn mainMenuBtn--play" id="tryAgainBtn" type="button">Play Again</button>
+    <button class="mainMenuBtn mainMenuBtn--about" id="goMainMenuBtn" type="button">Main Menu</button>
+  </div>
+</div>
+
+<div id="pauseScreen" class="pauseScreen menuModalContent" aria-hidden="true" role="dialog" aria-label="Paused">
+  <div class="pauseView pauseView--main" aria-label="Pause actions">
+    <h1>Paused</h1>
+    <p>Take a breather.</p>
+    <div class="pauseToggles" role="group" aria-label="Pause toggles">
+      <button id="pauseSoundBtn" class="miniBtn miniBtn--pause" type="button" aria-pressed="true">SOUND ON</button>
+    </div>
+    <div class="pauseActions" role="group" aria-label="Pause actions">
+      <button class="mainMenuBtn mainMenuBtn--play" id="resumeBtn" type="button">Resume</button>
+      <button class="mainMenuBtn mainMenuBtn--about" id="leaveGameBtn" type="button">Leave Game</button>
+    </div>
+  </div>
+
+  <div class="pauseView pauseView--confirm" aria-label="Leave confirmation">
+    <h1>Leave Game?</h1>
+    <p>Are you sure? You will lose current progress.</p>
+    <div class="confirmRow" role="group" aria-label="Leave confirmation">
+      <button id="confirmLeaveYesBtn" class="miniBtn" type="button">Yes</button>
+      <button id="confirmLeaveNoBtn" class="miniBtn miniBtn--pause" type="button">No</button>
+    </div>
+  </div>
+</div>
+
+<!-- Level Select Modal -->
+<div id="levelSelectModal" class="modal hidden" aria-label="Level select">
+  <div class="modalContent menuModalContent mainMenuPanelBg">
+    <h2>Select Level</h2>
+    <p id="levelSelectHint" style="margin-top:-6px; opacity:0.85;">Choose a starting level you have unlocked.</p>
+    <div id="levelSelectGrid" class="levelSelectGrid" role="group" aria-label="Level buttons"></div>
+    <button class="closeBtn" id="closeLevelSelectBtn" type="button">Back</button>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" class="modal hidden" aria-label="Settings">
+  <div class="modalContent menuModalContent">
+    <h2>Settings</h2>
+    <div class="settingsRow">
+      <label class="settingsLabel" for="playerNameInput">Player name</label>
+      <input id="playerNameInput" class="settingsInput" type="text" maxlength="16" placeholder="Pilot" autocomplete="nickname" />
+    </div>
+    <div class="settingsRow">
+      <button id="musicBtn" class="miniBtn" type="button" aria-pressed="true">MUSIC ON</button>
+      <button id="settingsAimBtn" class="miniBtn miniBtn--pause" type="button" aria-pressed="false">AIM: Z/X</button>
+    </div>
+    <button class="closeBtn" id="closeSettingsBtn" type="button">Close</button>
+  </div>
+</div>
+
+<!-- About Modal -->
+<div id="aboutModal" class="modal hidden" aria-label="About">
+  <div class="modalContent menuModalContent">
+    <h2>About</h2>
+    <p style="margin-top:6px; opacity:0.9; line-height:1.35;">
+      Cyber Yolks is a neon arcade survival game about drifting in a command capsule, harvesting dangerous crystal energy, and fighting jelly-core entities that only become vulnerable when they start to glow.
+    </p>
+    <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+      Survive the chaos, upgrade your systems with recovered fragments, and dive into unstable rifts for short bursts of extreme power — if the capsule holds.
+    </p>
+
+    <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+      You woke up alone in the capsule — a cockpit wrapped around a failing reactor core and a half-dead nav stack. No ship around you. No rescue ping. Just a slow spin through an empty grid of debris and light.
+    </p>
+    <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+      The first cannon wasn’t built in a hangar. It was welded together from salvage plates, cooling coils, and a lens ripped out of a survey drone. You bolted it to the capsule’s frame, routed power straight from the crystal collector, and prayed it wouldn’t crack the hull.
+    </p>
+    <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+      Now the swarm is constant: yolk-like creatures drifting in packs, drawn to the glow of your collector and the heat of your thrusters. They don’t “hunt” like animals — they converge like a signal. You shoot, you harvest, you patch the capsule, and you survive.
+    </p>
+
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; opacity:0.92; font-weight:900; letter-spacing:0.06em; text-transform:uppercase;">Lore Excerpt</summary>
+      <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+        “Then the signal showed up. Should’ve ignored it. Didn’t. Ran a scan. Ship tried to answer it back.”
+      </p>
+      <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+        “The collector lit the cockpit like a second sun. That’s when the first yolks appeared — not from behind an asteroid, not from a gate… just there. Like the void had been waiting for me to turn the lights on.”
+      </p>
+      <p style="margin-top:10px; opacity:0.9; line-height:1.35;">
+        “I built the cannon in zero-g with one hand in a suit glove and the other holding the capsule together. Every shot is a trade: heat for time, noise for distance, light for attention.”
+      </p>
+    </details>
+    <button class="closeBtn" id="closeAboutBtn" type="button">Close</button>
   </div>
 </div>
 
 <!-- Shop Modal -->
 <div id="shopModal" class="modal hidden">
-  <div class="modalContent">
-    <h2>Color Shop</h2>
+  <div class="modalContent menuModalContent">
+    <h2>Shop</h2>
     <p>Color Cash: <span id="shopCash">0</span></p>
 
     <div class="shopSection">
       <div class="shopSectionTitle">Ultimates</div>
       <div class="ultSelect" role="group" aria-label="Ultimate purchases">
-        <button id="ultLaserBtn" class="miniBtn" type="button">BUY LASER (250 CC)</button>
-        <button id="ultNukeBtn" class="miniBtn" type="button">BUY NUKE (750 CC)</button>
+        <button id="ultLaserBtn" class="miniBtn" type="button">BUY LASER (500 CC)</button>
+        <button id="ultNukeBtn" class="miniBtn" type="button">BUY NUKE (1500 CC)</button>
       </div>
       <div class="shopHint">Laser cooldown: <strong>30s</strong>. Nuke cooldown: <strong>60s</strong>. Laser uses <strong>Space</strong>. Nuke uses <strong>Shift</strong>.</div>
     </div>
@@ -129,14 +243,10 @@
 
 <!-- Leaderboard Modal -->
 <div id="boardModal" class="modal hidden">
-  <div class="modalContent">
-    <h2>High Scores</h2>
-    <div class="boardSort" aria-label="Sort leaderboard">
-      <button id="sortTimeBtn" class="miniBtn" type="button">TIME</button>
-      <button id="sortLevelBtn" class="miniBtn" type="button">LEVEL</button>
-      <button id="sortCashBtn" class="miniBtn" type="button">CASH</button>
-    </div>
-    <ol id="scoreList"></ol>
+  <div class="modalContent menuModalContent">
+    <h2>Leaderboard</h2>
+    <p class="boardHint">Best runs by survival time.</p>
+    <ol id="scoreList" class="scoreList"></ol>
     <button class="closeBtn" id="closeBoardBtn">Close</button>
   </div>
 </div>

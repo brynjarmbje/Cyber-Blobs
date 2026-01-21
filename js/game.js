@@ -6,6 +6,7 @@ import {
   POWERUP_DROP_CHANCE,
   LIFE_DROP_CHANCE,
   POWERUP_TYPES,
+  TROPHIES,
 } from './constants.js';
 
 import {
@@ -15,6 +16,8 @@ import {
   loadLeaderboard,
   loadOwnedUltimates,
   loadOwnedTrophies,
+  loadTrophyLevels,
+  loadPlayerName,
   loadUltimateType,
   loadMouseAimEnabled,
   loadMaxStartLevel,
@@ -23,6 +26,8 @@ import {
   saveMaxStartLevel,
   saveOwnedUltimates,
   saveOwnedTrophies,
+  saveTrophyLevels,
+  savePlayerName,
   saveUltimateType,
 } from './storage.js';
 
@@ -47,6 +52,8 @@ import { createRenderer3D } from './renderer3d.js';
 import { colorToRGBA, initEnemyBlob, updateEnemyBlob, drawJellyBlobEnemy } from './enemy2d.js';
 
 import { evaluateRunMilestones } from './achievements.js';
+
+import { syncMainMenuUi, openLevelSelectModal, installMenuBindings, createMenuActions } from './menus.js';
 
 export function createGame(ui) {
   const canvas = ui.canvas;
@@ -80,6 +87,7 @@ export function createGame(ui) {
   // Persistent profile state
   let cash = loadCash();
   let ownedTrophies = loadOwnedTrophies();
+  let trophyLevels = loadTrophyLevels(ownedTrophies);
   let leaderboard = loadLeaderboard();
   let achievements = loadAchievements();
   let ownedUltimates = loadOwnedUltimates();
@@ -91,10 +99,20 @@ export function createGame(ui) {
       cashMultiplier: 1,
     };
 
-    // Keep this in sync with constants TROPHIES
-    if (ownedTrophies.has('spark')) effects.startLives += 1;
-    if (ownedTrophies.has('prism')) effects.powerupDurationBonusMs += 5000;
-    if (ownedTrophies.has('nova')) effects.cashMultiplier *= 1.25;
+    for (const t of TROPHIES) {
+      const lvRaw = trophyLevels?.[t.id];
+      const level = Math.max(0, Math.floor(Number(lvRaw || 0))) || (ownedTrophies.has(t.id) ? 1 : 0);
+      if (level <= 0) continue;
+
+      const eff = t.effect || {};
+      if (typeof eff.startLives === 'number') effects.startLives += eff.startLives * level;
+      if (typeof eff.powerupDurationBonusMs === 'number') {
+        effects.powerupDurationBonusMs += eff.powerupDurationBonusMs * level;
+      }
+      if (typeof eff.cashMultiplier === 'number' && eff.cashMultiplier > 0) {
+        effects.cashMultiplier *= eff.cashMultiplier ** level;
+      }
+    }
 
     return effects;
   }
@@ -106,10 +124,105 @@ export function createGame(ui) {
   let level = 1;
   let startTimeMs = 0;
   let runStartCash = cash;
+  let inMainMenu = true;
+  let startCountdownActive = false;
+  let startCountdownToken = 0;
 
   // Checkpoint starts (unlock every 10 levels reached)
   let maxStartLevelUnlocked = loadMaxStartLevel();
   let nextRunStartLevel = 1;
+
+  function showMainMenu() {
+    cancelStartCountdown();
+    closeLeaveConfirm();
+    setPauseScreenVisible(false);
+    inMainMenu = true;
+    paused = false;
+    loopRunning = false;
+    syncPauseUi();
+    hideGameOver(ui);
+    closeModal(ui.levelSelectModal);
+    closeModal(ui.settingsModal);
+    closeModal(ui.aboutModal);
+    // Keep board/shop modals closed from menu entry.
+    closeModal(ui.shopModal);
+    closeModal(ui.boardModal);
+    if (ui?.mainMenu) ui.mainMenu.style.display = 'grid';
+    document.body.classList.remove('menuHidden');
+    emitPlayState('menu');
+    syncMainMenuUi(ui, { loadPlayerName });
+  }
+
+  function setStartCountdownVisible(visible, text = '') {
+    const el = ui?.startCountdownEl;
+    if (!el) return;
+    el.textContent = text;
+    el.classList.toggle('hidden', !visible);
+    el.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+
+  function cancelStartCountdown() {
+    startCountdownToken++;
+    startCountdownActive = false;
+    setStartCountdownVisible(false, '');
+  }
+
+  function sleepMs(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  function hideMainMenu() {
+    inMainMenu = false;
+    if (ui?.mainMenu) ui.mainMenu.style.display = 'none';
+    document.body.classList.add('menuHidden');
+  }
+
+  function openLevelSelect({ allowBackToMenu = true } = {}) {
+    openLevelSelectModal(ui, {
+      openModal,
+      maxStartLevelUnlocked,
+      startRunFromLevel,
+      allowBackToMenu,
+    });
+  }
+
+  function startRunFromLevel(startLevel) {
+    const lv = Number.isFinite(startLevel) ? Math.max(1, Math.floor(startLevel)) : 1;
+    nextRunStartLevel = lv;
+    hideMainMenu();
+    closeModal(ui.levelSelectModal);
+    closeModal(ui.settingsModal);
+    closeModal(ui.aboutModal);
+    // Reset gameplay state, but don't start the loop yet.
+    resetRun(lv, { autoStart: false });
+
+    // Start sequence (placeholder for future fancy intro animation).
+    void (async () => {
+      const token = ++startCountdownToken;
+      startCountdownActive = true;
+      paused = false;
+      loopRunning = false;
+      syncPauseUi();
+      emitPlayState('playing');
+
+      // Show 3-2-1-GO.
+      for (let s = 3; s >= 1; s--) {
+        if (token !== startCountdownToken) return;
+        setStartCountdownVisible(true, String(s));
+        await sleepMs(650);
+      }
+      if (token !== startCountdownToken) return;
+
+      setStartCountdownVisible(false, '');
+      startCountdownActive = false;
+
+      // Ensure the run timer starts at the actual gameplay start.
+      startTimeMs = performance.now();
+      updateHud(ui, buildHudState());
+
+      requestLoop();
+    })();
+  }
 
   function checkpointForLevel(lv) {
     const n = Math.floor(lv / 10) * 10;
@@ -203,7 +316,7 @@ export function createGame(ui) {
   let shootDelayMs = 250;
   let lastShotTimeMs = 0;
 
-  function createSfxPool(src, { poolSize = 6, volume = 0.12 } = {}) {
+  function createSfxPool(src, { poolSize = 6, volume = 0.09 } = {}) {
     const pool = [];
     for (let i = 0; i < poolSize; i++) {
       const a = new Audio(src);
@@ -276,8 +389,8 @@ export function createGame(ui) {
     return { play };
   }
 
-  const bulletSfx = createSfxPool('./CyberBlob-SoundFX-bullet.mp3', { poolSize: 6, volume: 0.14 });
-  const killSfx = createSfxPool('./CyberBlob-SoundFX-kill-v1.mp3', { poolSize: 5, volume: 0.16 });
+  const bulletSfx = createSfxPool('./CyberBlob-SoundFX-bullet.mp3', { poolSize: 6, volume: 0.085 });
+  const killSfx = createSfxPool('./CyberBlob-SoundFX-kill-v1.mp3', { poolSize: 5, volume: 0.10 });
 
   // Powerups
   let powerUps = [];
@@ -350,8 +463,30 @@ export function createGame(ui) {
     );
   }
 
+  function setPauseScreenVisible(visible) {
+    const el = ui?.pauseScreen;
+    if (!el) return;
+    el.style.display = visible ? 'block' : 'none';
+    el.setAttribute('aria-hidden', visible ? 'false' : 'true');
+  }
+
+  function openLeaveConfirm() {
+    if (!ui?.pauseScreen) return;
+    ui.pauseScreen.classList.add('isConfirmingLeave');
+  }
+
+  function closeLeaveConfirm() {
+    if (!ui?.pauseScreen) return;
+    ui.pauseScreen.classList.remove('isConfirmingLeave');
+  }
+
+  function confirmLeaveGame() {
+    closeLeaveConfirm();
+    setPauseScreenVisible(false);
+    showMainMenu();
+  }
+
   function syncPauseUi() {
-    if (ui?.pauseOverlay) ui.pauseOverlay.classList.toggle('visible', paused);
     if (ui?.pauseBtn) {
       ui.pauseBtn.classList.toggle('isActive', paused);
       ui.pauseBtn.setAttribute('aria-pressed', paused ? 'true' : 'false');
@@ -360,19 +495,51 @@ export function createGame(ui) {
     }
   }
 
+  function isSoundEnabled() {
+    const btn = ui?.musicBtn;
+    if (!btn) return true;
+    return btn.getAttribute('aria-pressed') !== 'false';
+  }
+
+  function syncSoundUi() {
+    const enabled = isSoundEnabled();
+
+    if (ui?.pauseSoundBtn) {
+      ui.pauseSoundBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      ui.pauseSoundBtn.classList.toggle('isMuted', !enabled);
+      ui.pauseSoundBtn.textContent = enabled ? 'SOUND ON' : 'SOUND OFF';
+      ui.pauseSoundBtn.title = enabled ? 'Sound enabled (tap to mute)' : 'Sound muted (tap to enable)';
+    }
+  }
+
+  function toggleSound() {
+    // Music button is the canonical audio toggle; SFX reads its aria state too.
+    ui?.musicBtn?.click?.();
+    syncSoundUi();
+  }
+
   function pauseGame() {
     if (gameOver) return;
+    if (inMainMenu) return;
+    if (startCountdownActive) return;
     if (paused) return;
     paused = true;
     loopRunning = false;
+    closeLeaveConfirm();
+    setPauseScreenVisible(true);
+    syncSoundUi();
     syncPauseUi();
     emitPlayState('paused');
   }
 
   function resumeGame() {
     if (gameOver) return;
+    if (inMainMenu) return;
+    if (startCountdownActive) return;
     if (!paused) return;
     paused = false;
+    closeLeaveConfirm();
+    setPauseScreenVisible(false);
     syncPauseUi();
     // Reset dt accumulator so we don't jump on resume.
     lastUpdateMs = performance.now();
@@ -381,6 +548,7 @@ export function createGame(ui) {
   }
 
   function togglePause() {
+    if (startCountdownActive) return;
     if (paused) resumeGame();
     else pauseGame();
   }
@@ -708,8 +876,8 @@ export function createGame(ui) {
   }
 
   function syncUltimateShopUi() {
-    const laserPrice = 250;
-    const nukePrice = 750;
+    const laserPrice = 500;
+    const nukePrice = 1500;
 
     if (ui.ultLaserBtn) {
       const owned = ult.laser.owned;
@@ -725,7 +893,7 @@ export function createGame(ui) {
 
   function buyUltimate(type) {
     if (type !== 'laser' && type !== 'nuke') return;
-    const price = type === 'laser' ? 250 : 750;
+    const price = type === 'laser' ? 500 : 1500;
     if (cash < price) return;
 
     if (type === 'laser' && ult.laser.owned) return;
@@ -1404,11 +1572,10 @@ export function createGame(ui) {
       cashEarned,
       bonusCash,
       unlocked,
-      maxStartLevel: maxStartLevelUnlocked,
     });
   }
 
-  function resetRun(startLevel = 1) {
+  function resetRun(startLevel = 1, { autoStart = true } = {}) {
     gameOver = false;
     hideGameOver(ui);
 
@@ -1457,10 +1624,11 @@ export function createGame(ui) {
     showCenterMessage(ui.levelUpMessage, `LEVEL ${level}`, 850);
     updateHud(ui, buildHudState());
 
-    emitPlayState('playing');
-
-    // Ensure the loop resumes after Game Over.
-    requestLoop();
+    if (autoStart) {
+      emitPlayState('playing');
+      // Ensure the loop resumes after Game Over.
+      requestLoop();
+    }
   }
 
   function buildHudState() {
@@ -1558,7 +1726,7 @@ export function createGame(ui) {
   }
 
   function update() {
-    if (gameOver || paused) {
+    if (gameOver || paused || inMainMenu) {
       loopRunning = false;
       return;
     }
@@ -2041,46 +2209,76 @@ export function createGame(ui) {
   }
 
   // UI bindings
-  function openShop() {
-    openModal(ui.shopModal);
-    renderShop(ui, ownedTrophies, cash, buyTrophy);
-    syncUltimateShopUi();
+  const menuActions = createMenuActions(ui, {
+    openModal,
+    closeModal,
+    renderShop,
+    renderScores,
+    loadLeaderboard,
+
+    getOwnedTrophies: () => ownedTrophies,
+    getTrophyLevels: () => trophyLevels,
+    getCash: () => cash,
+    buyTrophy: buyOrUpgradeTrophy,
+    syncUltimateShopUi,
+
+    isGameOver: () => gameOver,
+    getLeaderboard: () => leaderboard,
+    setLeaderboard: (v) => {
+      leaderboard = v;
+    },
+    getSortBy: () => sortBy,
+    setSortBy: (v) => {
+      sortBy = v;
+    },
+
+    getMouseAimEnabled: () => mouseAimEnabled,
+  });
+
+  function getTrophyNextCost(basePrice, nextLevel) {
+    const lv = Math.max(1, Math.floor(nextLevel || 1));
+    return Math.max(1, Math.floor(basePrice * 2 ** (lv - 1)));
   }
 
-  function openBoard() {
-    openModal(ui.boardModal);
-    leaderboard = loadLeaderboard();
-    renderScores(ui, leaderboard, sortBy);
-  }
+  function buyOrUpgradeTrophy(trophy) {
+    if (!trophy || typeof trophy !== 'object') return;
+    const id = trophy.id;
+    if (typeof id !== 'string' || id.length === 0) return;
 
-  function buyTrophy(trophy) {
-    if (ownedTrophies.has(trophy.id)) return;
-    if (cash < trophy.price) return;
+    const maxLevel = Math.max(1, Math.floor(Number(trophy.maxLevel || 1)));
+    const current = Math.max(0, Math.floor(Number(trophyLevels?.[id] || 0))) || (ownedTrophies.has(id) ? 1 : 0);
+    if (current >= maxLevel) return;
 
-    cash -= trophy.price;
-    ownedTrophies.add(trophy.id);
+    const nextLevel = Math.min(maxLevel, current + 1);
+    const cost = getTrophyNextCost(trophy.price, nextLevel);
+    if (cash < cost) return;
 
+    cash -= cost;
+    cashDirty = true;
     saveCash(cash);
+
+    trophyLevels = { ...(trophyLevels || {}) };
+    trophyLevels[id] = nextLevel;
+    saveTrophyLevels(trophyLevels);
+
+    ownedTrophies.add(id);
     saveOwnedTrophies(ownedTrophies);
 
     trophyEffects = computeTrophyEffects();
 
-    renderShop(ui, ownedTrophies, cash, buyTrophy);
+    renderShop(ui, trophyLevels, cash, buyOrUpgradeTrophy);
     updateHud(ui, buildHudState());
   }
 
-  function closeShop() {
-    closeModal(ui.shopModal);
-  }
-
-  function closeBoard() {
-    closeModal(ui.boardModal);
-  }
-
-  function setSort(next) {
-    sortBy = next;
-    renderScores(ui, leaderboard, sortBy);
-  }
+  const openShop = menuActions.openShop;
+  const openBoard = menuActions.openBoard;
+  const openSettings = menuActions.openSettings;
+  const openAbout = menuActions.openAbout;
+  const closeShop = menuActions.closeShop;
+  const closeBoard = menuActions.closeBoard;
+  const closeSettings = menuActions.closeSettings;
+  const closeAbout = menuActions.closeAbout;
+  const setSort = menuActions.setSort;
 
   function bindEvents() {
     const shouldIgnoreHotkeys = () => {
@@ -2089,6 +2287,11 @@ export function createGame(ui) {
       if (tag === 'INPUT' || tag === 'TEXTAREA' || ae?.isContentEditable) return true;
       if (ui.shopModal && !ui.shopModal.classList.contains('hidden')) return true;
       if (ui.boardModal && !ui.boardModal.classList.contains('hidden')) return true;
+      if (ui.settingsModal && !ui.settingsModal.classList.contains('hidden')) return true;
+      if (ui.aboutModal && !ui.aboutModal.classList.contains('hidden')) return true;
+      if (ui.levelSelectModal && !ui.levelSelectModal.classList.contains('hidden')) return true;
+      if (inMainMenu) return true;
+      if (startCountdownActive) return true;
       return false;
     };
 
@@ -2132,57 +2335,64 @@ export function createGame(ui) {
       }
     });
 
-    ui.tryAgainBtn?.addEventListener('click', () => resetRun(1));
-
-    ui.checkpointRow?.addEventListener('click', (e) => {
-      const btn = e.target?.closest?.('button[data-start-level]');
-      if (!btn) return;
-      const lv = Number(btn.dataset.startLevel);
-      if (!Number.isFinite(lv)) return;
-      // Only allow unlocked checkpoints.
-      if (lv < 10 || lv > maxStartLevelUnlocked) return;
-      nextRunStartLevel = lv;
-      resetRun(nextRunStartLevel);
-    });
-
-    ui.pauseBtn?.addEventListener('click', togglePause);
-
-    ui.openShopBtn?.addEventListener('click', openShop);
-    ui.openBoardBtn?.addEventListener('click', openBoard);
-    ui.closeShopBtn?.addEventListener('click', closeShop);
-    ui.closeBoardBtn?.addEventListener('click', closeBoard);
-    ui.goShopFromOver?.addEventListener('click', openShop);
-    ui.goScoresFromOver?.addEventListener('click', openBoard);
-
-    ui.sortTimeBtn?.addEventListener('click', () => setSort('time'));
-    ui.sortCashBtn?.addEventListener('click', () => setSort('cash'));
-    ui.sortLevelBtn?.addEventListener('click', () => setSort('level'));
-
-    // In-game ultimate buttons
-    ui.ultBtn?.addEventListener('click', tryActivateLaser);
-    ui.nukeBtn?.addEventListener('click', tryActivateNuke);
-    ui.laserTopBtn?.addEventListener('click', tryActivateLaser);
-    ui.nukeTopBtn?.addEventListener('click', tryActivateNuke);
-
-    // Shop purchases
-    ui.ultLaserBtn?.addEventListener('click', () => buyUltimate('laser'));
-    ui.ultNukeBtn?.addEventListener('click', () => buyUltimate('nuke'));
-
     const syncAimModeUi = () => {
       if (!ui.aimModeBtn) return;
       ui.aimModeBtn.textContent = mouseAimEnabled ? 'MOUSE' : 'Z/X';
       ui.aimModeBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
-      ui.aimModeBtn.title = mouseAimEnabled ? 'Mouse aim enabled (click to use Z/X)' : 'Z/X aim enabled (click to use mouse)';
+      ui.aimModeBtn.title = mouseAimEnabled
+        ? 'Mouse aim enabled (click to use Z/X)'
+        : 'Z/X aim enabled (click to use mouse)';
     };
 
-    syncAimModeUi();
+    installMenuBindings(ui, {
+      getMaxStartLevelUnlocked: () => maxStartLevelUnlocked || 0,
+      openLevelSelect,
+      startRunFromLevel,
+      showMainMenu,
+      closeLevelSelect: () => closeModal(ui.levelSelectModal),
+      isInMainMenu: () => inMainMenu,
 
-    ui.aimModeBtn?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      mouseAimEnabled = !mouseAimEnabled;
-      saveMouseAimEnabled(mouseAimEnabled);
-      syncAimModeUi();
+      togglePause,
+
+      toggleSound,
+
+      openLeaveConfirm,
+      closeLeaveConfirm,
+      confirmLeaveGame,
+
+      openShop,
+      openBoard,
+      openSettings,
+      openAbout,
+      closeShop,
+      closeBoard,
+      closeSettings,
+      closeAbout,
+
+      setSort,
+
+      tryActivateLaser,
+      tryActivateNuke,
+      buyUltimate,
+
+      syncAimModeUi,
+      toggleMouseAim: () => {
+        mouseAimEnabled = !mouseAimEnabled;
+        saveMouseAimEnabled(mouseAimEnabled);
+      },
+
+      onPlayerNameInput: (v) => {
+        savePlayerName(v);
+        syncMainMenuUi(ui, { loadPlayerName });
+      },
+      onSettingsAimToggle: () => {
+        mouseAimEnabled = !mouseAimEnabled;
+        saveMouseAimEnabled(mouseAimEnabled);
+        if (ui.settingsAimBtn) {
+          ui.settingsAimBtn.textContent = mouseAimEnabled ? 'AIM: MOUSE' : 'AIM: Z/X';
+          ui.settingsAimBtn.setAttribute('aria-pressed', mouseAimEnabled ? 'true' : 'false');
+        }
+      },
     });
 
     const updateMouseAimFromEvent = (e) => {
@@ -2341,8 +2551,8 @@ export function createGame(ui) {
     installJoystick(ui.moveStick, ui.moveKnob, axes.move);
     installJoystick(ui.aimStick, ui.aimKnob, axes.aim);
 
-    resetRun(1);
-    requestLoop();
+    // Boot into the main menu. Game starts after player chooses a level.
+    showMainMenu();
   }
 
   return {
