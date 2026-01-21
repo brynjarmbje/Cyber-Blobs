@@ -183,10 +183,21 @@ export function createGame(ui) {
   // Enemies / bullets / particles
   let enemies = [];
   let bullets = [];
+  // Renderer uses fixed-size instanced meshes for bullets; keep gameplay bullets within that limit.
+  const MAX_BULLETS = 256;
   let bulletSpeed = 5;
   let bulletRadius = 3;
   let bulletHitRadius = bulletRadius * 1.35;
   let particles = [];
+
+  function ensureBulletCapacity(addCount = 1) {
+    const want = bullets.length + Math.max(0, Math.floor(addCount));
+    if (want <= MAX_BULLETS) return;
+    const removeCount = want - MAX_BULLETS;
+    if (removeCount <= 0) return;
+    // Drop the oldest bullets first so new shots always show up.
+    bullets.splice(0, Math.min(removeCount, bullets.length));
+  }
 
   // Automatic shooting
   let shootDelayMs = 250;
@@ -276,6 +287,18 @@ export function createGame(ui) {
   let bounceShots = false;
   const maxLives = 6;
 
+  // Rift / bonus room
+  // Testing-friendly: keep the rift open longer so it's easier to find.
+  const RIFT_LIFETIME_MS = 60000;
+  const BONUS_ROOM_DURATION_MS = 20000;
+  let rift = null; // { x, y, radius, spawnedMs, expiresMs }
+  let nextRiftAtLevel = 0;
+  let inBonusRoom = false;
+  let bonusEndsAtMs = 0;
+  let bonusNextSpawnAtMs = 0;
+  let bonusForcedShotgun = false;
+  let mainWorldSnapshot = null;
+
   // Color order for this level
   let levelColors = [];
   let levelNextColorIndex = 0;
@@ -315,6 +338,7 @@ export function createGame(ui) {
   // Animation loop guard (prevents double RAF loops; allows restart after Game Over)
   let loopRunning = false;
   let lastUpdateMs = 0;
+  let updateTick = 0;
   let paused = false;
 
   function emitPlayState(state) {
@@ -405,6 +429,7 @@ export function createGame(ui) {
   }
 
   function ensureMapSize() {
+    if (inBonusRoom) return;
     // Grow-only so resizing the browser won't shrink the world.
     map.w = Math.max(map.w, Math.floor(world.w * 3));
     map.h = Math.max(map.h, Math.floor(world.h * 3));
@@ -478,8 +503,147 @@ export function createGame(ui) {
   }
 
   function isKillableEnemy(e) {
+    if (inBonusRoom) return true;
     const nextTargetColor = levelColors[levelNextColorIndex];
     return !!nextTargetColor && e.color === nextTargetColor;
+  }
+
+  function randInt(min, max) {
+    return Math.floor(min + Math.random() * (max - min + 1));
+  }
+
+  function scheduleNextRiftFromLevel(lv) {
+    nextRiftAtLevel = Math.max(1, Math.floor(lv)) + randInt(6, 10);
+  }
+
+  function createBonusMap({ w, h }) {
+    const border = 28;
+    const obstacles = [];
+    obstacles.push({ x: 0, y: 0, w, h: border });
+    obstacles.push({ x: 0, y: h - border, w, h: border });
+    obstacles.push({ x: 0, y: 0, w: border, h });
+    obstacles.push({ x: w - border, y: 0, w: border, h });
+    return { w, h, obstacles, kind: 'bonus' };
+  }
+
+  function spawnRift(nowMs) {
+    const radius = 18 * sizeScale;
+    const margin = radius + 44;
+    const minDist = 280;
+
+    let x = map.w / 2;
+    let y = map.h / 2;
+
+    for (let tries = 0; tries < 260; tries++) {
+      const cx = margin + Math.random() * (map.w - margin * 2);
+      const cy = margin + Math.random() * (map.h - margin * 2);
+
+      const dx = cx - player.x;
+      const dy = cy - player.y;
+      if (dx * dx + dy * dy < minDist * minDist) continue;
+      if (!canCircleFit(cx, cy, radius + 2)) continue;
+
+      x = cx;
+      y = cy;
+      break;
+    }
+
+    rift = {
+      x,
+      y,
+      radius,
+      spawnedMs: nowMs,
+      expiresMs: nowMs + RIFT_LIFETIME_MS,
+    };
+
+    showCenterMessage(ui.riftToast || ui.centerToast, 'A RIFT HAS OPENED', 1400);
+  }
+
+  function enterBonusRoom(nowMs) {
+    if (inBonusRoom) return;
+
+    mainWorldSnapshot = {
+      mapW: map.w,
+      mapH: map.h,
+      currentMap,
+      cameraX: camera.x,
+      cameraY: camera.y,
+      playerX: player.x,
+      playerY: player.y,
+      enemies,
+      bullets,
+      particles,
+      powerUps,
+      activePowerUps,
+      levelSpawn,
+      levelColors,
+      levelNextColorIndex,
+    };
+
+    inBonusRoom = true;
+    bonusForcedShotgun = true;
+    bonusEndsAtMs = nowMs + BONUS_ROOM_DURATION_MS;
+    bonusNextSpawnAtMs = nowMs;
+    rift = null;
+
+    const bonusW = Math.max(1200, Math.floor(world.w * 1.85));
+    const bonusH = Math.max(900, Math.floor(bonusW * 0.75));
+    map.w = bonusW;
+    map.h = bonusH;
+    currentMap = createBonusMap(map);
+
+    enemies = [];
+    bullets = [];
+    particles = [];
+    powerUps = [];
+    activePowerUps = [];
+    levelSpawn = null;
+    levelColors = [];
+    levelNextColorIndex = 0;
+
+    player.x = map.w / 2;
+    player.y = map.h / 2;
+    player.invulnerableUntil = nowMs + 450;
+    camera.x = clamp(player.x - world.w / 2, 0, Math.max(0, map.w - world.w));
+    camera.y = clamp(player.y - world.h / 2, 0, Math.max(0, map.h - world.h));
+
+    showCenterMessage(ui.riftToast || ui.centerToast, 'BONUS ROOM!', 900);
+  }
+
+  function exitBonusRoom(nowMs) {
+    if (!inBonusRoom) return;
+    if (!mainWorldSnapshot) {
+      inBonusRoom = false;
+      bonusForcedShotgun = false;
+      return;
+    }
+
+    // Restore world snapshot (keep cash/time/achievements as-is)
+    map.w = mainWorldSnapshot.mapW;
+    map.h = mainWorldSnapshot.mapH;
+    currentMap = mainWorldSnapshot.currentMap;
+    camera.x = mainWorldSnapshot.cameraX;
+    camera.y = mainWorldSnapshot.cameraY;
+    player.x = mainWorldSnapshot.playerX;
+    player.y = mainWorldSnapshot.playerY;
+    player.invulnerableUntil = nowMs + 900;
+
+    enemies = mainWorldSnapshot.enemies;
+    bullets = mainWorldSnapshot.bullets;
+    particles = mainWorldSnapshot.particles;
+    powerUps = mainWorldSnapshot.powerUps;
+    activePowerUps = mainWorldSnapshot.activePowerUps;
+    levelSpawn = mainWorldSnapshot.levelSpawn;
+    levelColors = mainWorldSnapshot.levelColors;
+    levelNextColorIndex = mainWorldSnapshot.levelNextColorIndex;
+
+    inBonusRoom = false;
+    bonusForcedShotgun = false;
+    bonusEndsAtMs = 0;
+    bonusNextSpawnAtMs = 0;
+    mainWorldSnapshot = null;
+
+    showCenterMessage(ui.riftToast || ui.centerToast, 'RETURNED', 700);
   }
 
   function advanceNextColorIfCleared() {
@@ -952,6 +1116,12 @@ export function createGame(ui) {
     spawnCircleBurst(x, y, 'rgba(30,144,255,0.5)', 5, 12);
   }
 
+  function spawnBulletVanishEffect(x, y) {
+    // A small, bright-ish pop so disappear events feel intentional.
+    spawnCircleBurst(x, y, 'rgba(255,255,255,0.22)', 4, 10);
+    spawnCircleBurst(x, y, 'rgba(0,255,255,0.12)', 6, 14);
+  }
+
   function addCashForColor(color) {
     const val = COLOR_CASH_VALUES[color] || 1;
     cash += Math.max(1, Math.round(val * trophyEffects.cashMultiplier));
@@ -1018,21 +1188,27 @@ export function createGame(ui) {
     piercingShots = newPiercing;
     shotgunActive = newShotgun;
     bounceShots = newBounce;
+
+    // Bonus-room overrides
+    if (bonusForcedShotgun) shotgunActive = true;
+    if (inBonusRoom) shootDelayMs = Math.min(shootDelayMs, 125);
   }
 
   function shootBullet() {
     if (shotgunActive) {
       const pellets = 5;
+      ensureBulletCapacity(pellets);
       for (let i = 0; i < pellets; i++) {
         const spread = (Math.random() - 0.5) * 0.5;
         const a = aimAngle + spread;
-        bullets.push({ x: player.x, y: player.y, vx: Math.cos(a), vy: Math.sin(a), bounceCount: 0, seed: Math.random() * Math.PI * 2 });
+        bullets.push({ x: player.x, y: player.y, vx: Math.cos(a), vy: Math.sin(a), seed: Math.random() * Math.PI * 2 });
       }
       spawnMuzzle(player.x, player.y);
       spawnCircleBurst(player.x, player.y, 'rgba(0,0,0,0.4)', 6, 16);
       bulletSfx.play();
     } else {
-      bullets.push({ x: player.x, y: player.y, vx: Math.cos(aimAngle), vy: Math.sin(aimAngle), bounceCount: 0, seed: Math.random() * Math.PI * 2 });
+      ensureBulletCapacity(1);
+      bullets.push({ x: player.x, y: player.y, vx: Math.cos(aimAngle), vy: Math.sin(aimAngle), seed: Math.random() * Math.PI * 2 });
       spawnMuzzle(player.x, player.y);
       bulletSfx.play();
     }
@@ -1091,6 +1267,44 @@ export function createGame(ui) {
     // Camera transform: map coords -> viewport
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
+
+    // Rift (2D effect pass so we don't need 3D changes)
+    if (rift && !inBonusRoom) {
+      const t = (nowMs - rift.spawnedMs) / 1000;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 4.2);
+      const r0 = rift.radius * (0.92 + 0.16 * pulse);
+
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(0,255,255,0.85)';
+      ctx.shadowBlur = 18;
+      ctx.strokeStyle = 'rgba(180,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(rift.x, rift.y, r0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([7, 7]);
+      ctx.lineDashOffset = -t * 24;
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.beginPath();
+      ctx.arc(rift.x, rift.y, r0 * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Little center spark
+      ctx.globalAlpha = 0.35;
+      ctx.fillStyle = 'rgba(0,255,255,0.55)';
+      ctx.beginPath();
+      ctx.arc(rift.x, rift.y, 4 + 2.5 * pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
 
     // Ultimate visuals
     if (ult.laser.active) {
@@ -1198,6 +1412,14 @@ export function createGame(ui) {
     gameOver = false;
     hideGameOver(ui);
 
+    // Always reset bonus/portal state when starting a run.
+    inBonusRoom = false;
+    bonusForcedShotgun = false;
+    bonusEndsAtMs = 0;
+    bonusNextSpawnAtMs = 0;
+    mainWorldSnapshot = null;
+    rift = null;
+
     paused = false;
     syncPauseUi();
 
@@ -1211,6 +1433,7 @@ export function createGame(ui) {
     activePowerUps = [];
 
     level = Math.max(1, Math.floor(startLevel));
+    scheduleNextRiftFromLevel(level);
     trophyEffects = computeTrophyEffects();
     player.lives = clamp(3 + trophyEffects.startLives, 1, maxLives);
     player.invulnerableUntil = 0;
@@ -1345,6 +1568,19 @@ export function createGame(ui) {
     // This prevents 120Hz phones from making the game feel too fast.
     const dtFrames = clamp((nowMs - (lastUpdateMs || nowMs)) / 16.67, 0.5, 2.0);
     lastUpdateMs = nowMs;
+    updateTick++;
+
+    // Rift expiration / bonus timer
+    if (inBonusRoom) {
+      if (nowMs >= bonusEndsAtMs) {
+        exitBonusRoom(nowMs);
+      }
+    } else {
+      if (rift && nowMs >= rift.expiresMs) {
+        rift = null;
+        showCenterMessage(ui.riftToast || ui.centerToast, 'THE RIFT CLOSED', 800);
+      }
+    }
 
     // Input -> movement
     let moveX = 0;
@@ -1422,6 +1658,16 @@ export function createGame(ui) {
       player.y = ny;
     }
 
+    // Rift pickup (enter bonus room)
+    if (!inBonusRoom && rift) {
+      const dx = player.x - rift.x;
+      const dy = player.y - rift.y;
+      const rad = player.radius + rift.radius;
+      if (dx * dx + dy * dy < rad * rad) {
+        enterBonusRoom(nowMs);
+      }
+    }
+
     // Auto shooting (time-based already)
     if (nowMs - lastShotTimeMs > shootDelayMs) {
       shootBullet();
@@ -1441,82 +1687,191 @@ export function createGame(ui) {
     updateCamera();
 
     // Level spawn trickle (spawns arrive over time)
-    updateSpawnTrickle(nowMs);
+    if (!inBonusRoom) {
+      updateSpawnTrickle(nowMs);
+    } else {
+      // Bonus room: spawn a lot of enemies fast.
+      const cap = 44;
+      const spawnEveryMs = 110;
+      if (nowMs >= bonusNextSpawnAtMs && enemies.length < cap) {
+        const color = COLOR_ORDER[Math.floor(Math.random() * COLOR_ORDER.length)];
+        const radius = (8.5 + Math.random() * 4.0) * sizeScale;
+        const { x, y } = getNonOverlappingSpawn(radius);
+        const speed = 1.55 + Math.random() * 0.45;
+
+        const sizeFactor = clamp(radius / (8.5 * sizeScale), 0.9, 1.7);
+        const isBig = sizeFactor >= 1.25;
+        const blobNodesCount = isBig ? 19 + Math.floor(Math.random() * 5) : 16 + Math.floor(Math.random() * 6);
+        const blobNoiseScale = isBig ? 0.90 + Math.random() * 0.15 : 1.0 + Math.random() * 0.25;
+        const blobSquishScale = isBig ? 0.85 + Math.random() * 0.15 : 0.95 + Math.random() * 0.20;
+        const blobBiasMag = 0.05 + Math.random() * 0.06;
+        const blobBiasAngle = Math.random() * Math.PI * 2;
+        const blobNoiseMulA = 2.0 + Math.random() * 1.2;
+        const blobNoiseMulB = 3.4 + Math.random() * 1.8;
+        const blobNoiseTimeA = 260 + Math.random() * 160;
+        const blobNoiseTimeB = 140 + Math.random() * 120;
+
+        enemies.push({
+          x,
+          y,
+          prevX: x,
+          prevY: y,
+          vx: 0,
+          vy: 0,
+          radius,
+          color,
+          speed,
+          wobblePhase: Math.random() * Math.PI * 2,
+          blobSeed: Math.random() * 1000,
+          blobNodesCount,
+          blobNoiseScale,
+          blobNoiseMulA,
+          blobNoiseMulB,
+          blobNoiseTimeA,
+          blobNoiseTimeB,
+          blobBiasMag,
+          blobBiasAngle,
+          blobSquishScale,
+          blobNodes: null,
+          blobLastMs: 0,
+        });
+
+        bonusNextSpawnAtMs = nowMs + spawnEveryMs;
+      }
+    }
 
     // Bullets
+    if (bullets.length > MAX_BULLETS) {
+      // Safety trim in case any other logic ever pushes bullets.
+      bullets.splice(0, bullets.length - MAX_BULLETS);
+    }
     for (let i = bullets.length - 1; i >= 0; i--) {
       const b = bullets[i];
       const step = bulletSpeed * dtFrames;
-      const beforeX = b.x;
-      const beforeY = b.y;
-      b.x += b.vx * step;
-      b.y += b.vy * step;
+      const maxSubSteps = 4;
+      const subSteps = Math.min(maxSubSteps, Math.max(1, Math.ceil(step / (bulletRadius * 1.25))));
+      const subStep = step / subSteps;
 
-      // Bullet-wall collisions
-      let hitWall = false;
-      for (const r of currentMap.obstacles) {
-        if (circleIntersectsRect(b.x, b.y, bulletRadius, r)) {
-          hitWall = true;
-          break;
+      let removed = false;
+      for (let s = 0; s < subSteps; s++) {
+        const beforeX = b.x;
+        const beforeY = b.y;
+        b.x += b.vx * subStep;
+        b.y += b.vy * subStep;
+
+        // Bullet vs obstacles (asteroids)
+        let hitIdx = -1;
+        let hitRect = null;
+        for (let oi = 0; oi < currentMap.obstacles.length; oi++) {
+          const r = currentMap.obstacles[oi];
+          if (circleIntersectsRect(b.x, b.y, bulletRadius, r)) {
+            hitIdx = oi;
+            hitRect = r;
+            break;
+          }
         }
-      }
 
-      let bouncedOffObstacle = false;
-      if (hitWall) {
-        if (bounceShots) {
-          // crude bounce: reflect based on which axis resolves more
-          const cand1 = resolveCircleVsObstacles(beforeX, b.y, bulletRadius);
-          const cand2 = resolveCircleVsObstacles(b.x, beforeY, bulletRadius);
-          // If moving only in Y still hits, flip Y; otherwise flip X.
-          if (cand2.hit && !cand1.hit) {
-            b.vy *= -1;
-            b.y = beforeY;
-          } else {
-            b.vx *= -1;
-            b.x = beforeX;
+        if (hitRect) {
+          if (!bounceShots) {
+            spawnBulletVanishEffect(b.x, b.y);
+            bullets.splice(i, 1);
+            removed = true;
+            break;
           }
 
-          // Make sure the bullet is not stuck inside an obstacle.
-          const pushed = resolveCircleVsObstacles(b.x, b.y, bulletRadius);
+          // Prevent endless bounce spam if we re-touch the same obstacle immediately.
+          if (b.lastBounceObs === hitIdx && nowMs - (b.lastBounceMs || 0) < 60) {
+            const pushed = resolveCircleVsRect(b.x, b.y, bulletRadius, hitRect);
+            if (pushed.hit) {
+              b.x = pushed.x;
+              b.y = pushed.y;
+            }
+            b.x += b.vx * 0.25;
+            b.y += b.vy * 0.25;
+            continue;
+          }
+
+          // Determine a reliable surface normal.
+          let nx = 0;
+          let ny = 0;
+          const rx1 = hitRect.x;
+          const ry1 = hitRect.y;
+          const rx2 = hitRect.x + hitRect.w;
+          const ry2 = hitRect.y + hitRect.h;
+
+          // Prefer the side we entered from based on previous position.
+          if (!circleIntersectsRect(beforeX, beforeY, bulletRadius, hitRect)) {
+            if (beforeX < rx1) nx = -1;
+            else if (beforeX > rx2) nx = 1;
+            if (beforeY < ry1) ny = -1;
+            else if (beforeY > ry2) ny = 1;
+          }
+
+          // Fallback: choose minimal penetration direction.
+          if (nx === 0 && ny === 0) {
+            const leftPen = Math.abs(b.x - rx1);
+            const rightPen = Math.abs(rx2 - b.x);
+            const topPen = Math.abs(b.y - ry1);
+            const botPen = Math.abs(ry2 - b.y);
+            const minPen = Math.min(leftPen, rightPen, topPen, botPen);
+            if (minPen === leftPen) nx = -1;
+            else if (minPen === rightPen) nx = 1;
+            else if (minPen === topPen) ny = -1;
+            else ny = 1;
+          }
+
+          // Reflect velocity on the axis/axes we hit.
+          if (nx !== 0) b.vx *= -1;
+          if (ny !== 0) b.vy *= -1;
+
+          // Push fully out of the obstacle and bias a bit outward.
+          const pushed = resolveCircleVsRect(b.x, b.y, bulletRadius, hitRect);
           if (pushed.hit) {
             b.x = pushed.x;
             b.y = pushed.y;
+          } else {
+            // Safety: if resolve didn't detect (shouldn't happen), revert.
+            b.x = beforeX;
+            b.y = beforeY;
           }
 
-          spawnBounceEffect(b.x, b.y);
-          bouncedOffObstacle = true;
-          b.bounceCount = (b.bounceCount || 0) + 1;
-          if ((b.bounceCount || 0) >= 2) {
-            bullets.splice(i, 1);
-            continue;
+          b.x += nx * 0.6;
+          b.y += ny * 0.6;
+          b.x += b.vx * 0.35;
+          b.y += b.vy * 0.35;
+
+          // Extra pass in case we clipped a corner / neighboring rect.
+          const pushed2 = resolveCircleVsObstacles(b.x, b.y, bulletRadius);
+          if (pushed2.hit) {
+            b.x = pushed2.x;
+            b.y = pushed2.y;
           }
-        } else {
-          bullets.splice(i, 1);
-          continue;
+
+          b.lastBounceObs = hitIdx;
+          b.lastBounceMs = nowMs;
+          spawnBounceEffect(b.x, b.y);
         }
       }
 
-      if (bounceShots && !bouncedOffObstacle) {
+      if (removed) continue;
+
+      // Map bounds behavior
+      if (bounceShots) {
         let bounced = false;
         if (b.x <= 0 || b.x >= map.w) {
           b.vx *= -1;
           b.x = clamp(b.x, 0, map.w);
-          b.bounceCount = (b.bounceCount || 0) + 1;
           bounced = true;
         }
         if (b.y <= 0 || b.y >= map.h) {
           b.vy *= -1;
           b.y = clamp(b.y, 0, map.h);
-          b.bounceCount = (b.bounceCount || 0) + 1;
           bounced = true;
         }
         if (bounced) spawnBounceEffect(b.x, b.y);
-        if ((b.bounceCount || 0) >= 2) {
-          bullets.splice(i, 1);
-          continue;
-        }
       } else {
         if (b.x < 0 || b.x > map.w || b.y < 0 || b.y > map.h) {
+          spawnBulletVanishEffect(b.x, b.y);
           bullets.splice(i, 1);
           continue;
         }
@@ -1581,7 +1936,10 @@ export function createGame(ui) {
       updateEnemyBlob(e, nowMs);
     }
 
-    separateEnemies();
+    // Separate enemies is O(n^2). Throttle slightly when the screen is crowded.
+    if (enemies.length <= 32 || (updateTick & 1) === 0) {
+      separateEnemies();
+    }
 
     // Ultimate can clear threats before collisions
     updateUltimate(nowMs);
@@ -1645,11 +2003,17 @@ export function createGame(ui) {
     }
 
     // All enemies cleared (including any pending trickle spawns)
-    if (enemies.length === 0 && (!levelSpawn || levelSpawn.pendingTotal <= 0)) {
+    if (!inBonusRoom && enemies.length === 0 && (!levelSpawn || levelSpawn.pendingTotal <= 0)) {
       level++;
       maybeUnlockCheckpoint(level);
       showCenterMessage(ui.levelUpMessage, `LEVEL ${level}`, 850);
       spawnEnemiesForLevel();
+
+      // Rift spawns every ~6–10 levels.
+      if (!rift && level >= nextRiftAtLevel) {
+        spawnRift(nowMs);
+        scheduleNextRiftFromLevel(level);
+      }
     }
 
     // Powerup pickup

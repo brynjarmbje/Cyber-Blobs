@@ -16,63 +16,9 @@ html, body {
   /* Prevent padding/borders from causing width overflow (especially in modals). */
   *, *::before, *::after { box-sizing: border-box; }
 
-  /* Subtle layered "misty galaxy" backdrop (cheap: gradients only, no JS). */
-  @keyframes bgDriftSlow {
-    0% { transform: translate3d(-1.5%, -1.0%, 0) scale(1.02); }
-    50% { transform: translate3d(1.2%, 1.0%, 0) scale(1.03); }
-    100% { transform: translate3d(-1.5%, -1.0%, 0) scale(1.02); }
-  }
-  @keyframes bgDriftSlower {
-    0% { transform: translate3d(1.0%, -0.8%, 0) scale(1.08); }
-    50% { transform: translate3d(-0.8%, 1.1%, 0) scale(1.07); }
-    100% { transform: translate3d(1.0%, -0.8%, 0) scale(1.08); }
-  }
-
+  /* Background mist removed (kept as solid dark base). */
   body::before,
-  body::after {
-    content: '';
-    position: fixed;
-    inset: -24vh -18vw;
-    pointer-events: none;
-    z-index: 0;
-    will-change: transform;
-  }
-
-  /* Big, blurry nebula clouds (moves very little). */
-  body::before {
-    opacity: 0.62;
-    filter: blur(30px) saturate(1.35);
-    background:
-      radial-gradient(900px 640px at 20% 30%, rgba(0, 255, 255, 0.10), rgba(0,0,0,0) 60%),
-      radial-gradient(760px 560px at 70% 40%, rgba(180, 80, 255, 0.08), rgba(0,0,0,0) 62%),
-      radial-gradient(820px 620px at 55% 75%, rgba(0, 160, 255, 0.07), rgba(0,0,0,0) 64%),
-      radial-gradient(940px 740px at 35% 85%, rgba(0, 255, 170, 0.05), rgba(0,0,0,0) 66%);
-    mix-blend-mode: screen;
-    animation: bgDriftSlower 26s ease-in-out infinite;
-  }
-
-  /* Fine grain + faint stars (slightly different drift for parallax). */
-  body::after {
-    opacity: 0.36;
-    background:
-      radial-gradient(1px 1px at 15% 22%, rgba(255,255,255,0.55), rgba(0,0,0,0) 60%),
-      radial-gradient(1px 1px at 70% 28%, rgba(255,255,255,0.45), rgba(0,0,0,0) 60%),
-      radial-gradient(1px 1px at 40% 65%, rgba(255,255,255,0.40), rgba(0,0,0,0) 60%),
-      radial-gradient(1px 1px at 85% 78%, rgba(255,255,255,0.35), rgba(0,0,0,0) 60%),
-      radial-gradient(2px 2px at 58% 44%, rgba(0,255,255,0.12), rgba(0,0,0,0) 70%),
-      radial-gradient(2px 2px at 26% 58%, rgba(255,120,0,0.10), rgba(0,0,0,0) 70%),
-      radial-gradient(1200px 900px at 50% 50%, rgba(255,255,255,0.035), rgba(0,0,0,0) 70%);
-    mix-blend-mode: screen;
-    animation: bgDriftSlow 18s ease-in-out infinite;
-  }
-
-  /* Keep app content above the background layers. */
-  #app { position: relative; z-index: 1; }
-
-  @media (prefers-reduced-motion: reduce) {
-    body::before,
-    body::after { animation: none; }
-  }
+  body::after { content: none; }
   
   /* App layout */
   #app { height: 100vh; display:grid; grid-template-rows:auto 1fr; }
@@ -463,6 +409,27 @@ html, body {
 
     #centerToast.visible { opacity: 1; }
 
+    /* Rift toast (slightly above the powerup toast) */
+    #riftToast {
+      position: absolute;
+      left: 50%;
+      top: 36%;
+      transform: translate(-50%, -50%);
+      font-size: 1.75rem;
+      font-weight: 950;
+      color: rgba(234,255,255,0.95);
+      text-shadow: 0 0 10px rgba(0,255,255,0.55), 0 0 22px rgba(0,255,255,0.22);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+      user-select: none;
+      letter-spacing: 0.6px;
+      z-index: 60;
+      text-align: center;
+    }
+
+    #riftToast.visible { opacity: 1; }
+
     /* Flying pickup label that moves into the top-right */
     .pickupFly {
       position: absolute;
@@ -584,7 +551,13 @@ html, body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 300px;
+    z-index: 500;
+    pointer-events: auto;
+    width: min(360px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 30px;
     background: rgba(0, 0, 0, 0.8);
     border: 2px solid #0ff; /* neon border color */
@@ -593,6 +566,8 @@ html, body {
     text-align: center;
     display: none; /* hidden by default */
   }
+
+  #gameOverScreen * { pointer-events: auto; }
 
   .checkpointRow {
     display: flex;

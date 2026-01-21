@@ -56,7 +56,8 @@ export function getUiElements() {
     goScoresFromOver: document.getElementById('goScoresFromOver'),
 
     levelUpMessage: document.getElementById('levelUpMessage'),
-    centerToast: document.getElementById('centerToast'),
+      centerToast: document.getElementById('centerToast'),
+      riftToast: document.getElementById('riftToast'),
     flashOverlay: document.getElementById('flashOverlay'),
     pauseOverlay: document.getElementById('pauseOverlay'),
 

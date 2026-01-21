@@ -501,7 +501,8 @@ export function createRenderer3D(glCanvas) {
   // Reason: per-instance colors on InstancedMesh are unreliable on some devices/browsers,
   // which makes enemies appear gray/black dots. Pooled meshes keep performance OK and
   // guarantee per-enemy color/material updates.
-  const enemyGeo = new THREE.SphereGeometry(1, 38, 28);
+  // Performance: enemy count can get high; keep geometry reasonably low-poly.
+  const enemyGeo = new THREE.SphereGeometry(1, 24, 16);
   const enemyBaseMat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xffffff),
     roughness: 0.08,
@@ -529,7 +530,7 @@ export function createRenderer3D(glCanvas) {
   });
 
   // Inner core glow to sell depth/"jelly" volume.
-  const enemyCoreGeo = new THREE.SphereGeometry(1, 18, 14);
+  const enemyCoreGeo = new THREE.SphereGeometry(1, 14, 10);
   const enemyCoreBaseMat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(0xffffff),
     transparent: true,
@@ -833,7 +834,7 @@ export function createRenderer3D(glCanvas) {
 
   // Powerups as pooled meshes.
   // Reason: instanced per-instance colors can be unreliable on some devices (same issue as enemies).
-  const pupGeo = new THREE.SphereGeometry(1, 18, 14);
+  const pupGeo = new THREE.SphereGeometry(1, 14, 10);
   const pupMatBase = new THREE.MeshStandardMaterial({
     color: new THREE.Color(0xffffff),
     roughness: 0.22,
@@ -1066,7 +1067,7 @@ export function createRenderer3D(glCanvas) {
   cannonBarrel.position.set(0.38, 0, 0);
   cannon.add(cannonBarrel);
 
-  const muzzleGeo = new THREE.SphereGeometry(0.16, 16, 12);
+  const muzzleGeo = new THREE.SphereGeometry(0.16, 10, 8);
   const muzzleGlow = new THREE.Mesh(muzzleGeo, cannonGlowMat);
   muzzleGlow.renderOrder = 67;
   muzzleGlow.position.set(0.68, 0, 0);
@@ -1146,7 +1147,8 @@ export function createRenderer3D(glCanvas) {
   }
 
   function setSize(w, h, dpr) {
-    const safeDpr = clamp(dpr || 1, 1, 2);
+    // Performance: on high-DPI screens, capping DPR reduces fill-rate cost a lot.
+    const safeDpr = clamp(dpr || 1, 1, 1.5);
     renderer.setPixelRatio(safeDpr);
     renderer.setSize(w, h, false);
 
