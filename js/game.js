@@ -457,7 +457,7 @@ export function createGame(ui) {
   function emitPlayState(state) {
     // state: 'playing' | 'paused' | 'gameover'
     window.dispatchEvent(
-      new CustomEvent('cyberblobs:playstate', {
+      new CustomEvent('cyberyolks:playstate', {
         detail: { state },
       })
     );
@@ -1602,7 +1602,7 @@ export function createGame(ui) {
     level = Math.max(1, Math.floor(startLevel));
     scheduleNextRiftFromLevel(level);
     trophyEffects = computeTrophyEffects();
-    player.lives = clamp(3 + trophyEffects.startLives, 1, maxLives);
+    player.lives = clamp(1 + trophyEffects.startLives, 1, maxLives);
     player.invulnerableUntil = 0;
 
     ensureMapSize();
