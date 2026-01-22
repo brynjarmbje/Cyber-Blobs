@@ -82,6 +82,15 @@ export const TROPHIES = [
     desc: '+10% cash from kills and +2s powerup duration per level',
     effect: { cashMultiplier: 1.1, powerupDurationBonusMs: 2000 },
   },
+  {
+    id: 'reservoir',
+    name: 'Reservoir Lattice',
+    price: 800,
+    maxLevel: 3,
+    icon: 'R',
+    desc: '-12% energy drain per level',
+    effect: { energyDrainMultiplier: 0.88 },
+  },
 ];
 
 export const POWERUP_DURATION_MS = 15000;
@@ -94,5 +103,6 @@ export const POWERUP_TYPES = {
   piercing: 'piercing',
   shotgun: 'shotgun',
   bounce: 'bounce',
+  stasis: 'stasis',
   life: 'life',
 };

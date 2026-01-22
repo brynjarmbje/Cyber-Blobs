@@ -34,6 +34,7 @@ export function getUiElements() {
     // HUD
     hudLevelEl: document.getElementById('hudLevel'),
     hudTimeEl: document.getElementById('hudTime'),
+    hudEnergyEl: document.getElementById('hudEnergy'),
     nextColorSwatchEl: document.getElementById('nextColorSwatch'),
     nextColorNameEl: document.getElementById('nextColorName'),
     livesContainerEl: document.getElementById('livesContainer'),
@@ -107,6 +108,7 @@ export function shortPowerName(type) {
   if (type === POWERUP_TYPES.piercing) return 'PIERCE';
   if (type === POWERUP_TYPES.shotgun) return 'SHGN';
   if (type === POWERUP_TYPES.bounce) return 'BNCE';
+  if (type === POWERUP_TYPES.stasis) return 'STAS';
   return type;
 }
 
@@ -126,6 +128,7 @@ export function updateHud(ui, state) {
     elapsedSeconds,
     nextColor,
     lives,
+    energyPercent,
     activePowerUps,
     cash,
     laserText,
@@ -144,6 +147,12 @@ export function updateHud(ui, state) {
 
   if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(level);
   if (ui.hudTimeEl) ui.hudTimeEl.textContent = String(Math.max(0, Math.floor(elapsedSeconds)));
+  if (ui.hudEnergyEl) {
+    const ep = clampPercent(energyPercent);
+    ui.hudEnergyEl.textContent = `${ep}%`;
+    ui.hudEnergyEl.classList.toggle('energyLow', ep > 0 && ep <= 25);
+    ui.hudEnergyEl.classList.toggle('energyCritical', ep > 0 && ep <= 10);
+  }
 
   // NEXT target: rendered by the 3D renderer into the swatch canvas.
   if (ui.nextColorSwatchEl) ui.nextColorSwatchEl.title = nextColor ? `Target: ${nextColor}` : 'Target';
@@ -194,6 +203,12 @@ export function updateHud(ui, state) {
     laserCooldownSeconds: Number(laserCooldownSeconds) || 0,
     nukeCooldownSeconds: Number(nukeCooldownSeconds) || 0,
   });
+}
+
+function clampPercent(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 function syncAimModeHint(ui, { mouseAimEnabled }) {

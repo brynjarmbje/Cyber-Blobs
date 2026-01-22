@@ -411,42 +411,208 @@ export function createRenderer3D(glCanvas) {
     rockEdgeGeos.push(new THREE.EdgesGeometry(g, 18));
   }
 
+  // Procedural rock textures (keeps this project asset-light but adds a lot of depth).
+  function makeRockAlbedoTexture(seed, size = 256) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0b0f18';
+    ctx.fillRect(0, 0, size, size);
+
+    // Base mottling
+    const img = ctx.getImageData(0, 0, size, size);
+    const data = img.data;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const n =
+          (rand2(x * 0.9 + seed * 13.1, y * 0.9 - seed * 7.7) * 0.55 +
+            rand2(x * 2.1 - seed * 4.2, y * 2.1 + seed * 11.3) * 0.30 +
+            rand2(x * 4.4 + seed * 9.8, y * 4.4 + seed * 1.1) * 0.15);
+        const v = 26 + Math.floor(n * 54);
+        const i = (y * size + x) * 4;
+        data[i + 0] = v;
+        data[i + 1] = v + 4;
+        data[i + 2] = v + 10;
+        data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // A few brighter speckles
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = 'rgba(180,200,220,1)';
+    for (let i = 0; i < 520; i++) {
+      const x = Math.floor(rand2(seed * 99.1 + i * 1.7, i * 8.3) * size);
+      const y = Math.floor(rand2(seed * 21.7 + i * 2.9, i * 3.1) * size);
+      const r = 0.6 + rand2(i * 2.3, seed * 8.7) * 1.4;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2.0, 2.0);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 2;
+    return tex;
+  }
+
+  function makeRockBumpTexture(seed, size = 256) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const n =
+          (rand2(x * 0.9 + seed * 4.1, y * 0.9 - seed * 2.7) * 0.50 +
+            rand2(x * 2.0 - seed * 1.2, y * 2.0 + seed * 7.3) * 0.35 +
+            rand2(x * 4.0 + seed * 3.8, y * 4.0 + seed * 1.1) * 0.15);
+        const v = Math.floor(n * 255);
+        const i = (y * size + x) * 4;
+        data[i + 0] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+        data[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    const tex = new THREE.CanvasTexture(c);
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2.0, 2.0);
+    tex.anisotropy = 2;
+    return tex;
+  }
+
+  const rockAlbedoTex = makeRockAlbedoTexture(13.37, 256);
+  const rockBumpTex = makeRockBumpTexture(77.17, 256);
+
   const rockMatBase = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0x2b2f38),
-    roughness: 0.95,
-    metalness: 0.08,
-    envMapIntensity: 0.55,
+    color: new THREE.Color(0x5b6678),
+    roughness: 0.88,
+    metalness: 0.14,
+    envMapIntensity: 0.95,
+    emissive: new THREE.Color(0x0b1220),
+    emissiveIntensity: 0.65,
+    flatShading: true,
   });
+  rockMatBase.map = rockAlbedoTex;
+  rockMatBase.bumpMap = rockBumpTex;
+  rockMatBase.bumpScale = 0.32;
   const rockEdgeMatBase = new THREE.LineBasicMaterial({
     color: new THREE.Color(0xbfe9ff),
     transparent: true,
-    opacity: 0.08,
+    opacity: 0.055,
     blending: THREE.AdditiveBlending,
     depthTest: false,
   });
 
-  const crystalGeo = new THREE.ConeGeometry(0.28, 1.0, 6, 1);
+  // Crystal silhouette: thin cone shards read better top-down than octahedra (which can look like squares).
+  const crystalGeo = new THREE.ConeGeometry(0.22, 1.35, 10, 1);
   const crystalMatBase = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xffffff),
     roughness: 0.15,
     metalness: 0.0,
-    transmission: 0.35,
-    thickness: 0.6,
-    ior: 1.38,
+    transmission: 0.28,
+    thickness: 1.0,
+    ior: 1.55,
     clearcoat: 1.0,
     clearcoatRoughness: 0.05,
-    envMapIntensity: 1.55,
+    envMapIntensity: 1.75,
+    attenuationColor: new THREE.Color(0xffffff),
+    attenuationDistance: 4.5,
     emissive: new THREE.Color(0xffffff),
-    emissiveIntensity: 0.25,
+    emissiveIntensity: 1.15,
   });
   const crystalGlowMatBase = new THREE.MeshBasicMaterial({
     color: new THREE.Color(0xffffff),
     transparent: true,
-    opacity: 0.22,
+    opacity: 0.38,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     depthTest: false,
     side: THREE.BackSide,
+  });
+
+  // Embedded crystal deposits (glowing pockets/veins on the asteroid surface).
+  function makeCrystalDepositTexture(size = 256) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    ctx.clearRect(0, 0, size, size);
+
+    // Irregular mask: noisy radial field.
+    const img = ctx.createImageData(size, size);
+    const data = img.data;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const dx = (x - cx) / (size * 0.5);
+        const dy = (y - cy) / (size * 0.5);
+        const r = Math.sqrt(dx * dx + dy * dy);
+        const n =
+          rand2(x * 2.2, y * 2.2) * 0.55 +
+          rand2(x * 5.6 + 91.7, y * 5.6 - 33.2) * 0.30 +
+          rand2(x * 11.1 - 44.4, y * 11.1 + 12.3) * 0.15;
+        const edge = 1.0 - r;
+        const mask = clamp(edge * 1.35 + (n - 0.5) * 0.55, 0, 1);
+        const a = Math.floor(mask * 255);
+        const i = (y * size + x) * 4;
+        // Color is applied via material tint; keep texture white.
+        data[i + 0] = 255;
+        data[i + 1] = 255;
+        data[i + 2] = 255;
+        data[i + 3] = a;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    // Hot core bloom
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.48);
+    g.addColorStop(0.0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.25, 'rgba(255,255,255,0.65)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.18)');
+    g.addColorStop(1.0, 'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 2;
+    return tex;
+  }
+
+  const crystalDepositTex = makeCrystalDepositTexture(256);
+  const crystalDepositGeo = new THREE.CircleGeometry(1.0, 28);
+  const crystalDepositMatBase = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x66ccff),
+    map: crystalDepositTex,
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+
+  const targetRingGeo = new THREE.TorusGeometry(1.18, 0.06, 12, 64);
+  const targetRingMatBase = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x66ffff),
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
   });
 
   const obstacleGroups = [];
@@ -487,6 +653,26 @@ export function createRenderer3D(glCanvas) {
       g.userData.edges = edges;
       g.userData.crystals = crystals;
       g.userData.crystalGlows = crystalGlows;
+
+      const crystalDeposits = [];
+      for (let i = 0; i < 3; i++) {
+        const d = new THREE.Mesh(crystalDepositGeo, crystalDepositMatBase.clone());
+        d.visible = false;
+        d.renderOrder = 38;
+        // Slight lift to avoid Z-fighting with the rock.
+        d.position.z = 1.03;
+        g.add(d);
+        crystalDeposits.push(d);
+      }
+      g.userData.crystalDeposits = crystalDeposits;
+
+      const targetRing = new THREE.Mesh(targetRingGeo, targetRingMatBase.clone());
+      targetRing.visible = false;
+      targetRing.renderOrder = 39;
+      targetRing.rotation.x = Math.PI / 2;
+      targetRing.position.z = 1.05;
+      g.add(targetRing);
+      g.userData.targetRing = targetRing;
 
       worldRoot.add(g);
       obstacleGroups.push(g);
@@ -1177,9 +1363,12 @@ export function createRenderer3D(glCanvas) {
 
   function render(state) {
     if (!state) return;
-    const { cam, map, world, player, aimAngle, enemies, bullets, powerUps, obstacles, nowMs, bulletRadius, bulletSpeed, nextEnemyPreview } = state;
+    const { cam, map, world, player, aimAngle, enemies, bullets, powerUps, obstacles, nowMs, bulletRadius, bulletSpeed, nextEnemyPreview, energyRatio } = state;
 
     const tNow = nowMs || performance.now();
+
+    const er = typeof energyRatio === 'number' ? energyRatio : 1;
+    const lowEnergy = er <= 0.25;
 
     const cx = cam?.x || 0;
     const cy = cam?.y || 0;
@@ -1300,6 +1489,11 @@ export function createRenderer3D(glCanvas) {
     // Obstacles -> asteroids + crystals
     const obs = obstacles || [];
     ensureAsteroidPool(obs.length);
+
+    let bestCrystalIdx = -1;
+    let bestCrystalD2 = Number.POSITIVE_INFINITY;
+    let bestCrystalHue = 205;
+
     for (let i = 0; i < obs.length; i++) {
       const r = obs[i];
       const ow = Math.max(1, r.w);
@@ -1321,6 +1515,9 @@ export function createRenderer3D(glCanvas) {
       g.visible = true;
       g.position.set(toVX(ox), toVY(oy), height * 0.45);
 
+      const ring = g.userData.targetRing;
+      if (ring) ring.visible = false;
+
       // Render obstacles as asteroids (avoid long stretched shapes).
       const sxy = Math.min(ow, oh) * 0.55;
       const sz = height * 0.55;
@@ -1331,8 +1528,8 @@ export function createRenderer3D(glCanvas) {
       g.userData.rock.rotation.set((seed - 0.5) * 0.8, (seeded01(seed + 2.2) - 0.5) * 0.8, 0);
 
       // Rock material variation
-      const rockHue = 210 + 30 * seeded01(seed + 9.1);
-      const rockLight = 18 + 10 * seeded01(seed + 9.9);
+      const rockHue = 210 + 28 * seeded01(seed + 9.1);
+      const rockLight = 26 + 18 * seeded01(seed + 9.9);
       g.userData.rock.material.color.setHSL(rockHue / 360, 0.18, rockLight / 100);
 
       // Subtle edge glow tint
@@ -1343,6 +1540,7 @@ export function createRenderer3D(glCanvas) {
       // Crystals on some asteroids
       const crystals = g.userData.crystals;
       const glows = g.userData.crystalGlows;
+      const deposits = g.userData.crystalDeposits;
       const crystalChance = seeded01(seed + 6.6);
       const crystalCount = crystalChance > 0.72 ? 3 : crystalChance > 0.58 ? 2 : crystalChance > 0.48 ? 1 : 0;
       const crystalHue =
@@ -1355,6 +1553,21 @@ export function createRenderer3D(glCanvas) {
               : kind === 'barrier'
                 ? 35
                 : 205;
+
+      const crystalHueJitter = (seeded01(seed + 15.7) - 0.5) * 18;
+      const pulse = 0.5 + 0.5 * Math.sin(tNow / 260 + seed * 9.1);
+      const flick = 0.55 + 0.45 * Math.sin(tNow / 120 + seed * 6.7);
+
+      if (lowEnergy && crystalCount > 0) {
+        const dx = ox - (player?.x || 0);
+        const dy = oy - (player?.y || 0);
+        const d2 = dx * dx + dy * dy;
+        if (d2 < bestCrystalD2) {
+          bestCrystalD2 = d2;
+          bestCrystalIdx = i;
+          bestCrystalHue = crystalHue;
+        }
+      }
 
       for (let k = 0; k < crystals.length; k++) {
         const on = k < crystalCount;
@@ -1371,19 +1584,65 @@ export function createRenderer3D(glCanvas) {
         const pz = 0.80 + 0.25 * seeded01(seed + 12.0 + k * 1.9);
 
         c.position.set(px, py, pz);
-        c.rotation.set(-0.4, 0, a);
-        const cs = 0.35 + 0.35 * seeded01(seed + 13.0 + k * 2.1);
+        c.rotation.set(-0.55, 0, a);
+        const cs = 0.28 + 0.34 * seeded01(seed + 13.0 + k * 2.1);
         c.scale.set(cs, cs, cs);
 
-        c.material.color.setHSL(crystalHue / 360, 0.95, 0.70);
-        c.material.emissive.setHSL(crystalHue / 360, 0.95, 0.62);
-        c.material.emissiveIntensity = 0.25 + 0.25 * seeded01(seed + 14.0 + k * 1.1);
+        const h = (crystalHue + crystalHueJitter + (seeded01(seed + 16.1 + k * 1.9) - 0.5) * 10) / 360;
+        c.material.color.setHSL(h, 0.98, 0.74);
+        c.material.emissive.setHSL(h, 0.98, 0.66);
+        c.material.emissiveIntensity = (0.65 + 0.55 * seeded01(seed + 14.0 + k * 1.1)) * (lowEnergy ? 1.65 : 1.0);
+
+        // Physical attenuation uses a separate color; keep it in sync for saturated gems.
+        if (c.material.attenuationColor) c.material.attenuationColor.setHSL(h, 0.98, 0.68);
 
         cg.position.copy(c.position);
         cg.rotation.copy(c.rotation);
-        cg.scale.set(cs * 1.25, cs * 1.25, cs * 1.25);
-        cg.material.color.setHSL(crystalHue / 360, 0.95, 0.72);
-        cg.material.opacity = 0.18;
+        cg.scale.set(
+          cs * ((1.6 + pulse * 0.35) + (lowEnergy ? 0.45 : 0.0)),
+          cs * ((1.6 + pulse * 0.35) + (lowEnergy ? 0.45 : 0.0)),
+          cs * ((1.6 + pulse * 0.35) + (lowEnergy ? 0.45 : 0.0))
+        );
+        cg.material.color.setHSL(h, 0.98, 0.76);
+        cg.material.opacity = (0.28 + pulse * 0.22) + (lowEnergy ? 0.18 : 0.0);
+      }
+
+      // Embedded deposits: glowing pockets on the rock surface.
+      if (deposits) {
+        const depositCount = crystalCount > 0 ? (crystalCount >= 3 ? 3 : 2) : 0;
+        for (let k = 0; k < deposits.length; k++) {
+          const on = k < depositCount;
+          const d = deposits[k];
+          d.visible = on;
+          if (!on) continue;
+
+          const a = seeded01(seed + 31.1 + k * 2.3) * Math.PI * 2;
+          const rr = 0.35 + 0.30 * seeded01(seed + 32.7 + k * 1.9);
+          const px = Math.cos(a) * rr;
+          const py = Math.sin(a) * rr;
+          const pz = 0.92 + 0.16 * seeded01(seed + 33.9 + k * 1.7);
+          d.position.set(px, py, pz);
+          d.rotation.z = seeded01(seed + 34.4 + k * 3.1) * Math.PI * 2;
+
+          const h = (crystalHue + crystalHueJitter + (seeded01(seed + 35.7 + k * 1.7) - 0.5) * 10) / 360;
+          d.material.color.setHSL(h, 0.90, 0.60);
+
+          const baseS = 0.72 + 0.55 * seeded01(seed + 36.2 + k * 1.3);
+          d.scale.setScalar(baseS * (0.95 + pulse * 0.16));
+          d.material.opacity = (0.16 + pulse * 0.20) * (0.70 + 0.60 * flick) * (lowEnergy ? 1.25 : 1.0);
+        }
+      }
+    }
+
+    if (lowEnergy && bestCrystalIdx >= 0) {
+      const g = obstacleGroups[bestCrystalIdx];
+      const ring = g?.userData?.targetRing;
+      if (ring) {
+        const rp = 0.5 + 0.5 * Math.sin(tNow / 190);
+        ring.visible = true;
+        ring.material.color.setHSL(bestCrystalHue / 360, 0.95, 0.62);
+        ring.material.opacity = 0.12 + rp * 0.24;
+        ring.scale.setScalar(1.08 + rp * 0.28);
       }
     }
 

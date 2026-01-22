@@ -354,7 +354,7 @@ html, body {
   .hudItem.wide { flex: 1 1 240px; justify-content:center; }
 
   /* Keep HUD width stable so values don't cause wrapping/jitter */
-  #hudLevel, #hudTime, #colorCash {
+  #hudLevel, #hudTime, #colorCash, #hudEnergy {
     display: inline-block;
     text-align: right;
     font-variant-numeric: tabular-nums;
@@ -362,6 +362,29 @@ html, body {
   #hudLevel { min-width: 2ch; }
   #hudTime { min-width: 4ch; }
   #colorCash { min-width: 4ch; }
+  #hudEnergy { min-width: 4ch; }
+
+  #hudEnergy.energyLow {
+    color: #ffe08a;
+    text-shadow: 0 0 10px rgba(255, 200, 60, 0.35);
+    animation: energyPulse 0.9s ease-in-out infinite;
+  }
+
+  #hudEnergy.energyCritical {
+    color: #ff7fb3;
+    text-shadow: 0 0 12px rgba(255, 60, 190, 0.45);
+    animation: energyPulseCritical 0.7s ease-in-out infinite;
+  }
+
+  @keyframes energyPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.55; }
+  }
+
+  @keyframes energyPulseCritical {
+    0%, 100% { opacity: 1; transform: translateZ(0); }
+    50% { opacity: 0.45; }
+  }
 
   .nextWrap { display:flex; align-items:center; gap:6px; }
 

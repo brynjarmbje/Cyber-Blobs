@@ -76,6 +76,10 @@ export function createGame(ui) {
 
   let currentMap = createNeonMap(map);
 
+  // Asteroid visuals: draw in 2D with a satisfying, animated blob-like style.
+  // We keep gameplay collisions as rectangles; this is purely a visual layer.
+  const USE_2D_ASTEROIDS = true;
+
   // Camera top-left in map coordinates.
   const camera = {
     x: 0,
@@ -97,6 +101,7 @@ export function createGame(ui) {
       startLives: 0,
       powerupDurationBonusMs: 0,
       cashMultiplier: 1,
+      energyDrainMultiplier: 1,
     };
 
     for (const t of TROPHIES) {
@@ -111,6 +116,9 @@ export function createGame(ui) {
       }
       if (typeof eff.cashMultiplier === 'number' && eff.cashMultiplier > 0) {
         effects.cashMultiplier *= eff.cashMultiplier ** level;
+      }
+      if (typeof eff.energyDrainMultiplier === 'number' && eff.energyDrainMultiplier > 0) {
+        effects.energyDrainMultiplier *= eff.energyDrainMultiplier ** level;
       }
     }
 
@@ -248,8 +256,531 @@ export function createGame(ui) {
     speed: 3,
     color: 'magenta',
     lives: 3,
+    energy: 100,
     invulnerableUntil: 0,
   };
+
+  // Capsule energy/fuel (movement). Refills by docking to crystal asteroids.
+  const ENERGY_MAX = 100;
+  const ENERGY_DRAIN_PER_SEC = 4;
+  const ENERGY_EMPTY_SPEED_MULT = 0.18;
+  const ENERGY_DOCK_RANGE = 26;
+  const ENERGY_AUTO_DOCK_THRESHOLD = 0.25;
+  const ENERGY_AUTO_DOCK_IDLE_MS = 650;
+  const ENERGY_CONNECT_MS = 2000;
+  const ENERGY_RECHARGE_MS = 4000;
+
+  // Global enemy slow (from STASIS powerup)
+  let enemySpeedMult = 1;
+
+  let dockRequested = false;
+  let dockAutoEligibleSinceMs = -Infinity;
+  let dockLastPromptMs = -Infinity;
+
+  const energyDock = {
+    phase: 'idle',
+    obstacleIndex: -1,
+    ox: 0,
+    oy: 0,
+    fieldRadius: 0,
+    connectEndsAtMs: 0,
+    chargeStartedAtMs: 0,
+    chargeStartEnergy: 0,
+    chargeEndsAtMs: 0,
+  };
+
+  function seeded01(seed) {
+    const n = Math.sin(seed * 999.123) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function obstacleHasCrystals(r, i) {
+    const ow = Math.max(1, r.w);
+    const oh = Math.max(1, r.h);
+    const ox = r.x + ow / 2;
+    const oy = r.y + oh / 2;
+    const seed = seeded01((ox * 0.013 + oy * 0.017 + i * 0.11) * 100.0);
+    const crystalChance = seeded01(seed + 6.6);
+    const crystalCount = crystalChance > 0.72 ? 3 : crystalChance > 0.58 ? 2 : crystalChance > 0.48 ? 1 : 0;
+    return crystalCount > 0;
+  }
+
+  // Cache per-obstacle visual data so asteroids feel stable and "hand-crafted".
+  const asteroidVisuals = new Map();
+  function getAsteroidVisual(i, r) {
+    const existing = asteroidVisuals.get(i);
+    const ow = Math.max(1, r.w);
+    const oh = Math.max(1, r.h);
+    const ox = r.x + ow / 2;
+    const oy = r.y + oh / 2;
+    const seed = seeded01((ox * 0.013 + oy * 0.017 + i * 0.11) * 100.0);
+    if (existing && existing.seed === seed) return existing;
+
+    const baseR = Math.min(ow, oh) * 0.56;
+    // Fewer nodes + stronger radial variation reads more "rocky" and pointy.
+    const nodes = 12 + Math.floor(seeded01(seed + 2.2) * 6);
+    const nodeData = [];
+    for (let k = 0; k < nodes; k++) {
+      const a = (k / nodes) * Math.PI * 2;
+      const rVar = seeded01(seed + 10.7 + k * 1.31);
+      // Bias towards occasional spikes.
+      const spike = seeded01(seed + 12.9 + k * 1.97);
+      const br = 0.62 + 0.78 * Math.pow(rVar, 0.78) + 0.35 * Math.max(0, spike - 0.62);
+      nodeData.push({ a, br });
+    }
+
+    // Crystal deposit anchors (embedded glows)
+    const deposits = [];
+    const depCount = 2 + Math.floor(seeded01(seed + 6.9) * 2); // 2..3
+    for (let k = 0; k < depCount; k++) {
+      const a = seeded01(seed + 30.1 + k * 2.7) * Math.PI * 2;
+      const rr = 0.28 + 0.36 * seeded01(seed + 31.7 + k * 1.9);
+      deposits.push({
+        a,
+        rr,
+        s: 0.55 + 0.55 * seeded01(seed + 32.9 + k * 1.4),
+      });
+    }
+
+    // Speckles (deterministic) for rock grit
+    const speckles = [];
+    const speckCount = 26 + Math.floor(seeded01(seed + 40.2) * 26);
+    for (let k = 0; k < speckCount; k++) {
+      const a = seeded01(seed + 41.1 + k * 1.19) * Math.PI * 2;
+      const rr = Math.sqrt(seeded01(seed + 42.7 + k * 2.13)) * 0.95;
+      speckles.push({
+        a,
+        rr,
+        r: 0.6 + seeded01(seed + 43.9 + k * 3.3) * 1.6,
+        o: 0.06 + seeded01(seed + 44.4 + k * 0.9) * 0.12,
+      });
+    }
+
+    const v = { seed, baseR, nodes, nodeData, deposits, speckles };
+    asteroidVisuals.set(i, v);
+    return v;
+  }
+
+  function isBorderObstacle(r) {
+    const kind = r.kind || 'wall';
+    if (kind === 'border') return true;
+    // Map border colliders can be giant rectangles.
+    if (r.w > map.w * 0.8 || r.h > map.h * 0.8) return true;
+    return false;
+  }
+
+  function drawAsteroids2D(nowMs) {
+    const obs = currentMap?.obstacles || [];
+    const lowEnergy = player.energy / ENERGY_MAX <= 0.25;
+
+    const nearestCrystal = lowEnergy ? findNearestCrystalAsteroidTarget() : null;
+    const nearestCrystalIdx = nearestCrystal ? nearestCrystal.i : -1;
+
+    for (let i = 0; i < obs.length; i++) {
+      const r = obs[i];
+      if (!r || isBorderObstacle(r)) continue;
+
+      const ow = Math.max(1, r.w);
+      const oh = Math.max(1, r.h);
+      const ox = r.x + ow / 2;
+      const oy = r.y + oh / 2;
+
+      const v = getAsteroidVisual(i, r);
+      const baseR = v.baseR;
+
+      // Subtle "alive" animation (keep it low so rocks feel solid).
+      const wobA = 0.5 + 0.5 * Math.sin(nowMs / 980 + v.seed * 12.1);
+      const wobB = 0.5 + 0.5 * Math.sin(nowMs / 610 + v.seed * 5.9);
+      const wob = 0.020 * wobA + 0.012 * wobB;
+
+      // Build smooth blob path via quadratic midpoints.
+      const pts = [];
+      for (let k = 0; k < v.nodeData.length; k++) {
+        const n = v.nodeData[k];
+        const nr = baseR * (0.84 + 0.38 * n.br) * (1 + wob * Math.sin(n.a * 2.6 + nowMs / 900));
+        pts.push({ x: ox + Math.cos(n.a) * nr, y: oy + Math.sin(n.a) * nr });
+      }
+
+      const rockHue = 210 + 28 * seeded01(v.seed + 9.1);
+      const rockLight = 10 + 16 * seeded01(v.seed + 9.9);
+      const baseCol = `hsl(${rockHue}, 22%, ${rockLight}%)`;
+
+      const lightX = ox - baseR * 0.45;
+      const lightY = oy - baseR * 0.55;
+      const g = ctx.createRadialGradient(lightX, lightY, baseR * 0.08, ox, oy, baseR * 1.25);
+      g.addColorStop(0.0, 'rgba(255,255,255,0.50)');
+      g.addColorStop(0.18, baseCol);
+      g.addColorStop(1.0, 'rgba(4,6,10,0.92)');
+
+      ctx.save();
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      // Polygon path + miter joins gives a faceted/rocky silhouette.
+      ctx.lineJoin = 'miter';
+      ctx.miterLimit = 6;
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k].x, pts[k].y);
+      ctx.closePath();
+      ctx.fill();
+
+      // Rock grit
+      ctx.save();
+      ctx.clip();
+      ctx.globalAlpha = 1;
+      for (const s of v.speckles) {
+        const sx = ox + Math.cos(s.a) * baseR * s.rr;
+        const sy = oy + Math.sin(s.a) * baseR * s.rr;
+        ctx.globalAlpha = s.o;
+        ctx.fillStyle = 'rgba(220,235,255,1)';
+        ctx.beginPath();
+        ctx.arc(sx, sy, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      // Rim light (depth)
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.16;
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = lowEnergy ? 'rgba(120,220,255,0.20)' : 'rgba(200,230,255,0.16)';
+      ctx.stroke();
+      ctx.restore();
+
+      // Subtle contour
+      ctx.globalAlpha = 0.34;
+      ctx.lineWidth = 1.15;
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      // Crystals: embedded glowing deposits + a few shard highlights.
+      const hasCrystals = obstacleHasCrystals(r, i);
+      if (hasCrystals) {
+        const crystalPulse = 0.55 + 0.45 * Math.sin(nowMs / 260 + v.seed * 9.1);
+        const flick = 0.55 + 0.45 * Math.sin(nowMs / 120 + v.seed * 6.7);
+        const glowBoost = lowEnergy ? 1.55 : 1.0;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (let k = 0; k < v.deposits.length; k++) {
+          const d = v.deposits[k];
+          const px = ox + Math.cos(d.a) * baseR * d.rr;
+          const py = oy + Math.sin(d.a) * baseR * d.rr;
+          const rr = baseR * (0.26 + 0.22 * d.s);
+
+          const gg = ctx.createRadialGradient(px, py, 0, px, py, rr * 1.55);
+          gg.addColorStop(0.0, `rgba(150,245,255,${(0.68 + 0.20 * crystalPulse) * glowBoost})`);
+          gg.addColorStop(0.35, `rgba(60,170,255,${(0.38 + 0.20 * flick) * glowBoost})`);
+          gg.addColorStop(1.0, 'rgba(0,0,0,0)');
+          ctx.fillStyle = gg;
+          ctx.beginPath();
+          ctx.ellipse(px, py, rr * (1.05 + 0.08 * crystalPulse), rr * (0.78 + 0.08 * flick), d.a, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Protruding shards (pointy crystal feel)
+          const shardCount = 3 + Math.floor(seeded01(v.seed + 61.2 + k * 2.9) * 2); // 3..4
+          for (let s = 0; s < shardCount; s++) {
+            const rs = seeded01(v.seed + 62.7 + k * 7.1 + s * 3.3);
+            const aa =
+              d.a +
+              (rs - 0.5) * 1.15 +
+              0.25 * Math.sin(nowMs / 700 + v.seed * 6.2 + s * 1.7);
+            const len = rr * (0.95 + 1.05 * seeded01(v.seed + 63.3 + k * 5.7 + s * 2.1));
+            const wid = rr * (0.16 + 0.14 * seeded01(v.seed + 64.9 + k * 4.4 + s * 2.6));
+
+            const bx = px + Math.cos(aa) * rr * 0.20;
+            const by = py + Math.sin(aa) * rr * 0.20;
+            const tx = bx + Math.cos(aa) * len;
+            const ty = by + Math.sin(aa) * len;
+            const nx = -Math.sin(aa);
+            const ny = Math.cos(aa);
+
+            const cPulse = 0.55 + 0.45 * Math.sin(nowMs / 240 + v.seed * 9.1 + s);
+            ctx.globalAlpha = (0.14 + 0.18 * cPulse) * glowBoost;
+            ctx.fillStyle = 'rgba(235,255,255,0.95)';
+            ctx.beginPath();
+            ctx.moveTo(tx, ty);
+            ctx.lineTo(bx + nx * wid, by + ny * wid);
+            ctx.lineTo(bx - nx * wid, by - ny * wid);
+            ctx.closePath();
+            ctx.fill();
+
+            // Tiny bright edge stroke
+            ctx.globalAlpha = (0.10 + 0.10 * cPulse) * glowBoost;
+            ctx.strokeStyle = 'rgba(120,235,255,0.85)';
+            ctx.lineWidth = 1.1;
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+        ctx.restore();
+      }
+
+      // Nearest crystal target ring when low energy.
+      if (lowEnergy && i === nearestCrystalIdx) {
+        const pulse = 0.5 + 0.5 * Math.sin(nowMs / 220);
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineWidth = 2 + 2 * pulse;
+        ctx.strokeStyle = `rgba(120, 235, 255, ${0.28 + 0.32 * pulse})`;
+        ctx.beginPath();
+        ctx.arc(ox, oy, baseR * (1.05 + 0.12 * pulse), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  function dockFieldRadiusForObstacle(r) {
+    const ow = Math.max(1, r.w);
+    const oh = Math.max(1, r.h);
+    const base = Math.min(ow, oh);
+    return clamp(base * 1.85, 140, 340);
+  }
+
+  // Nearest crystal asteroid (by distance), regardless of whether it's currently dockable.
+  function findNearestCrystalAsteroidTarget() {
+    const obs = currentMap?.obstacles || [];
+    let best = null;
+    let bestD2 = Infinity;
+
+    for (let i = 0; i < obs.length; i++) {
+      const r = obs[i];
+      if (!r || isBorderObstacle(r)) continue;
+      if (!obstacleHasCrystals(r, i)) continue;
+
+      const ox = r.x + Math.max(1, r.w) / 2;
+      const oy = r.y + Math.max(1, r.h) / 2;
+      const dx = player.x - ox;
+      const dy = player.y - oy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = { i, r, ox, oy };
+      }
+    }
+
+    return best;
+  }
+
+  function findNearestCrystalDockTarget() {
+    const obs = currentMap?.obstacles || [];
+    let best = null;
+    let bestD2 = Infinity;
+
+    for (let i = 0; i < obs.length; i++) {
+      const r = obs[i];
+      if (!r) continue;
+
+      // Skip giant border colliders (top/bottom/left/right walls).
+      if (r.w > map.w * 0.8 || r.h > map.h * 0.8) continue;
+      if (!obstacleHasCrystals(r, i)) continue;
+
+      const hit = circleIntersectsRect(player.x, player.y, player.radius + ENERGY_DOCK_RANGE, r);
+      if (!hit) continue;
+
+      const ox = r.x + Math.max(1, r.w) / 2;
+      const oy = r.y + Math.max(1, r.h) / 2;
+      const dx = player.x - ox;
+      const dy = player.y - oy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = { i, r, ox, oy };
+      }
+    }
+
+    return best;
+  }
+
+  function findNearestCrystalTouchTarget() {
+    const obs = currentMap?.obstacles || [];
+    let best = null;
+    let bestD2 = Infinity;
+
+    for (let i = 0; i < obs.length; i++) {
+      const r = obs[i];
+      if (!r) continue;
+
+      if (isBorderObstacle(r)) continue;
+      if (!obstacleHasCrystals(r, i)) continue;
+
+      // Must be physically touching the asteroid.
+      const touch = circleIntersectsRect(player.x, player.y, player.radius + 4, r);
+      if (!touch) continue;
+
+      const ox = r.x + Math.max(1, r.w) / 2;
+      const oy = r.y + Math.max(1, r.h) / 2;
+      const dx = player.x - ox;
+      const dy = player.y - oy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bestD2) {
+        bestD2 = d2;
+        best = { i, r, ox, oy };
+      }
+    }
+
+    return best;
+  }
+
+  function clearEnergyDock() {
+    energyDock.phase = 'idle';
+    energyDock.obstacleIndex = -1;
+    energyDock.ox = 0;
+    energyDock.oy = 0;
+    energyDock.fieldRadius = 0;
+    energyDock.connectEndsAtMs = 0;
+    energyDock.chargeStartedAtMs = 0;
+    energyDock.chargeStartEnergy = 0;
+    energyDock.chargeEndsAtMs = 0;
+  }
+
+  function requestEnergyDock() {
+    dockRequested = true;
+  }
+
+  function startEnergyDock(target, nowMs) {
+    energyDock.phase = 'connecting';
+    energyDock.obstacleIndex = target.i;
+    energyDock.ox = target.ox;
+    energyDock.oy = target.oy;
+    energyDock.fieldRadius = dockFieldRadiusForObstacle(target.r);
+    energyDock.connectEndsAtMs = nowMs + ENERGY_CONNECT_MS;
+    energyDock.chargeEndsAtMs = 0;
+
+    dockAutoEligibleSinceMs = -Infinity;
+    dockRequested = false;
+
+    showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTING — HOLD STILL', ENERGY_CONNECT_MS);
+  }
+
+  function isPlayerTouchingDockObstacle() {
+    const idx = energyDock.obstacleIndex;
+    if (idx < 0) return false;
+    const r = currentMap?.obstacles?.[idx];
+    if (!r) return false;
+    if (!obstacleHasCrystals(r, idx)) return false;
+    return circleIntersectsRect(player.x, player.y, player.radius + 4, r);
+  }
+
+  function isPlayerInsideDockField() {
+    const dx = player.x - energyDock.ox;
+    const dy = player.y - energyDock.oy;
+    return dx * dx + dy * dy <= energyDock.fieldRadius * energyDock.fieldRadius;
+  }
+
+  function updateEnergyDock(nowMs, { wantsMove }) {
+    if (inBonusRoom) {
+      if (energyDock.phase !== 'idle') clearEnergyDock();
+      dockRequested = false;
+      dockAutoEligibleSinceMs = -Infinity;
+      return;
+    }
+
+    if (energyDock.phase === 'idle') {
+      const target = findNearestCrystalDockTarget();
+      const desktopLike = window.matchMedia?.('(hover:hover) and (pointer:fine)')?.matches;
+      const touchLike = !desktopLike;
+
+      if (dockRequested) {
+        dockRequested = false;
+        if (target && player.energy < ENERGY_MAX - 0.01) {
+          startEnergyDock(target, nowMs);
+        } else {
+          showCenterMessage(ui.centerToast || ui.riftToast, 'NO CRYSTAL LINK AVAILABLE', 650);
+        }
+      }
+
+      const canDockHere = !!target && player.energy < ENERGY_MAX - 0.01;
+      if (canDockHere) {
+        const energyRatio = clamp(player.energy / ENERGY_MAX, 0, 1);
+
+        // Prompt (rate-limited) so players learn the mechanic.
+        if (energyRatio <= 0.75 && nowMs - dockLastPromptMs > 1200) {
+          dockLastPromptMs = nowMs;
+          const msg = desktopLike
+            ? 'CRYSTAL ASTEROID: PRESS E TO CONNECT'
+            : 'CRYSTAL ASTEROID: STOP TO CONNECT';
+          showCenterMessage(ui.riftToast || ui.centerToast, msg, 700);
+        }
+
+        // Touch-friendly auto-dock:
+        // On mobile/touch devices, start connecting automatically when the player is still and
+        // physically touching a crystal asteroid. No E required.
+        if (touchLike) {
+          const touchTarget = findNearestCrystalTouchTarget();
+          if (touchTarget && !wantsMove) {
+            if (!Number.isFinite(dockAutoEligibleSinceMs)) dockAutoEligibleSinceMs = nowMs;
+            // Small debounce to avoid accidental triggers when sliding along edges.
+            if (nowMs - dockAutoEligibleSinceMs >= 120) {
+              startEnergyDock(touchTarget, nowMs);
+            }
+          } else {
+            dockAutoEligibleSinceMs = -Infinity;
+          }
+        } else {
+          // Desktop auto-dock stays as a low-energy assist.
+          if (energyRatio <= ENERGY_AUTO_DOCK_THRESHOLD && !wantsMove) {
+            if (!Number.isFinite(dockAutoEligibleSinceMs)) dockAutoEligibleSinceMs = nowMs;
+            if (nowMs - dockAutoEligibleSinceMs >= ENERGY_AUTO_DOCK_IDLE_MS) {
+              startEnergyDock(target, nowMs);
+            }
+          } else {
+            dockAutoEligibleSinceMs = -Infinity;
+          }
+        }
+      } else {
+        dockAutoEligibleSinceMs = -Infinity;
+      }
+
+      return;
+    }
+
+    if (energyDock.phase === 'connecting') {
+      // Player can move to escape, but moving (or stepping away) cancels the connection.
+      if (wantsMove || !isPlayerTouchingDockObstacle()) {
+        clearEnergyDock();
+        showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTION ABORTED', 550);
+        return;
+      }
+      if (nowMs >= energyDock.connectEndsAtMs) {
+        energyDock.phase = 'charging';
+        energyDock.chargeStartedAtMs = nowMs;
+        energyDock.chargeStartEnergy = player.energy;
+        energyDock.chargeEndsAtMs = nowMs + ENERGY_RECHARGE_MS;
+        showCenterMessage(ui.centerToast || ui.riftToast, 'FIELD ONLINE — STAY INSIDE', 900);
+      }
+      return;
+    }
+
+    if (energyDock.phase === 'charging') {
+      if (!isPlayerInsideDockField()) {
+        clearEnergyDock();
+        showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTION LOST', 700);
+        return;
+      }
+
+      // While inside the field, energy ramps up to 50% (cap), but only hitting 100%
+      // if the player stays inside for the full charge duration.
+      const capEnergy = ENERGY_MAX * 0.5;
+      const startE = energyDock.chargeStartEnergy;
+      const rampMs = ENERGY_RECHARGE_MS * 0.5;
+      const elapsed = Math.max(0, nowMs - energyDock.chargeStartedAtMs);
+      const t = clamp(elapsed / Math.max(1, rampMs), 0, 1);
+      const rampTarget = startE >= capEnergy ? startE : (startE + (capEnergy - startE) * t);
+      player.energy = Math.max(player.energy, Math.min(capEnergy, rampTarget));
+
+      if (nowMs >= energyDock.chargeEndsAtMs) {
+        player.energy = ENERGY_MAX;
+        clearEnergyDock();
+        showCenterMessage(ui.centerToast || ui.riftToast, 'ENERGY FULL', 850);
+        return;
+      }
+    }
+  }
 
   // Aim / input
   let aimAngle = 0;
@@ -265,6 +796,7 @@ export function createGame(ui) {
     d: false,
     z: false,
     x: false,
+    e: false,
   };
 
   // Touch joystick axes (range -1..1)
@@ -1307,6 +1839,7 @@ export function createGame(ui) {
         POWERUP_TYPES.piercing,
         POWERUP_TYPES.shotgun,
         POWERUP_TYPES.bounce,
+        POWERUP_TYPES.stasis,
       ];
       const type = types[Math.floor(Math.random() * types.length)];
       powerUps.push({ x, y, radius: 8 * sizeScale, type });
@@ -1342,6 +1875,7 @@ export function createGame(ui) {
     let newPiercing = false;
     let newShotgun = false;
     let newBounce = false;
+    let newEnemySpeedMult = 1;
 
     for (const p of activePowerUps) {
       if (p.type === POWERUP_TYPES.speed) newSpeed += 2;
@@ -1349,6 +1883,7 @@ export function createGame(ui) {
       else if (p.type === POWERUP_TYPES.piercing) newPiercing = true;
       else if (p.type === POWERUP_TYPES.shotgun) newShotgun = true;
       else if (p.type === POWERUP_TYPES.bounce) newBounce = true;
+      else if (p.type === POWERUP_TYPES.stasis) newEnemySpeedMult = Math.min(newEnemySpeedMult, 0.22);
     }
 
     player.speed = newSpeed;
@@ -1356,6 +1891,7 @@ export function createGame(ui) {
     piercingShots = newPiercing;
     shotgunActive = newShotgun;
     bounceShots = newBounce;
+    enemySpeedMult = newEnemySpeedMult;
 
     // Bonus-room overrides
     if (bonusForcedShotgun) shotgunActive = true;
@@ -1405,6 +1941,8 @@ export function createGame(ui) {
                     ? 'gold'
                     : p.type === POWERUP_TYPES.bounce
                       ? 'dodgerblue'
+                      : p.type === POWERUP_TYPES.stasis
+                        ? 'springgreen'
                       : 'crimson';
         }
       }
@@ -1420,13 +1958,14 @@ export function createGame(ui) {
         cam: camera,
         map,
         player,
+        energyRatio: clamp(player.energy / ENERGY_MAX, 0, 1),
         aimAngle,
         enemies,
         bullets,
         bulletSpeed,
         bulletRadius,
         powerUps,
-        obstacles: currentMap?.obstacles || [],
+        obstacles: USE_2D_ASTEROIDS ? [] : (currentMap?.obstacles || []),
         nextEnemyPreview,
       });
     }
@@ -1435,6 +1974,76 @@ export function createGame(ui) {
     // Camera transform: map coords -> viewport
     ctx.save();
     ctx.translate(-camera.x, -camera.y);
+
+    // Asteroids + crystal deposits (2D visual layer)
+    if (USE_2D_ASTEROIDS) {
+      drawAsteroids2D(nowMs);
+    }
+
+    // Low-energy guidance: show an edge pointer towards the nearest crystal asteroid.
+    // Only show when low energy and the target is off-screen.
+    if (player.energy / ENERGY_MAX <= 0.25) {
+      const target = findNearestCrystalAsteroidTarget();
+      if (target && typeof target.ox === 'number' && typeof target.oy === 'number') {
+        const vx = target.ox - camera.x;
+        const vy = target.oy - camera.y;
+        const margin = 46;
+        const onScreen = vx >= margin && vx <= world.w - margin && vy >= margin && vy <= world.h - margin;
+        if (!onScreen) {
+          const cx = world.w * 0.5;
+          const cy = world.h * 0.5;
+          let dx = vx - cx;
+          let dy = vy - cy;
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len;
+          dy /= len;
+
+          // Place pointer along the viewport edge with padding.
+          const maxX = cx - margin;
+          const maxY = cy - margin;
+          const t = Math.min(
+            maxX / Math.max(0.001, Math.abs(dx)),
+            maxY / Math.max(0.001, Math.abs(dy))
+          );
+          const px = cx + dx * t;
+          const py = cy + dy * t;
+
+          const pulse = 0.5 + 0.5 * Math.sin(nowMs / 170);
+          const size = 14 + pulse * 5;
+
+          ctx.save();
+          // Draw in screen space (undo camera translation for this element).
+          ctx.translate(camera.x, camera.y);
+          ctx.translate(px, py);
+          ctx.rotate(Math.atan2(dy, dx));
+
+          ctx.globalAlpha = 0.65 + pulse * 0.25;
+          ctx.fillStyle = 'rgba(0,255,255,0.85)';
+          ctx.shadowColor = 'rgba(0,255,255,0.9)';
+          ctx.shadowBlur = 18;
+
+          // Simple chevron/arrow.
+          ctx.beginPath();
+          ctx.moveTo(size, 0);
+          ctx.lineTo(-size * 0.8, size * 0.7);
+          ctx.lineTo(-size * 0.55, 0);
+          ctx.lineTo(-size * 0.8, -size * 0.7);
+          ctx.closePath();
+          ctx.fill();
+
+          // Small ring behind arrow.
+          ctx.globalAlpha = 0.18 + pulse * 0.12;
+          ctx.shadowBlur = 0;
+          ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(0, 0, 18 + pulse * 6, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.restore();
+        }
+      }
+    }
 
     // Rift (2D effect pass so we don't need 3D changes)
     if (rift && !inBonusRoom) {
@@ -1471,6 +2080,34 @@ export function createGame(ui) {
       ctx.arc(rift.x, rift.y, 4 + 2.5 * pulse, 0, Math.PI * 2);
       ctx.fill();
 
+      ctx.restore();
+    }
+
+    // Crystal energy field (while charging)
+    if (energyDock.phase === 'charging') {
+      const t = nowMs / 450;
+      const pulse = 0.5 + 0.5 * Math.sin(t * 2.2);
+      ctx.save();
+      ctx.globalAlpha = 0.18 + pulse * 0.16;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      ctx.shadowColor = 'rgba(0,255,255,0.85)';
+      ctx.shadowBlur = 20;
+      ctx.strokeStyle = 'rgba(180,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(energyDock.ox, energyDock.oy, energyDock.fieldRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.globalAlpha = 0.10 + pulse * 0.10;
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;
+      ctx.setLineDash([8, 8]);
+      ctx.lineDashOffset = -t * 18;
+      ctx.strokeStyle = 'rgba(255,255,255,0.70)';
+      ctx.beginPath();
+      ctx.arc(energyDock.ox, energyDock.oy, energyDock.fieldRadius * 0.92, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
       ctx.restore();
     }
 
@@ -1603,6 +2240,8 @@ export function createGame(ui) {
     scheduleNextRiftFromLevel(level);
     trophyEffects = computeTrophyEffects();
     player.lives = clamp(1 + trophyEffects.startLives, 1, maxLives);
+    player.energy = ENERGY_MAX;
+    clearEnergyDock();
     player.invulnerableUntil = 0;
 
     ensureMapSize();
@@ -1661,6 +2300,7 @@ export function createGame(ui) {
       elapsedSeconds,
       nextColor: next,
       lives: player.lives,
+      energyPercent: (player.energy / ENERGY_MAX) * 100,
       activePowerUps,
       cash,
       nowMs,
@@ -1738,6 +2378,8 @@ export function createGame(ui) {
     lastUpdateMs = nowMs;
     updateTick++;
 
+    const dtSeconds = dtFrames / 60;
+
     // Rift expiration / bonus timer
     if (inBonusRoom) {
       if (nowMs >= bonusEndsAtMs) {
@@ -1762,6 +2404,22 @@ export function createGame(ui) {
       if (keys.ArrowDown || keys.s) moveY = player.speed * dtFrames;
       if (keys.ArrowLeft || keys.a) moveX = -player.speed * dtFrames;
       if (keys.ArrowRight || keys.d) moveX = player.speed * dtFrames;
+    }
+
+    const wantsMove = Math.abs(moveX) > 1e-6 || Math.abs(moveY) > 1e-6;
+    updateEnergyDock(nowMs, { wantsMove });
+
+    const inRechargeField = energyDock.phase === 'charging';
+    const speedMult = !inRechargeField && player.energy <= 0.0001 ? ENERGY_EMPTY_SPEED_MULT : 1;
+    moveX *= speedMult;
+    moveY *= speedMult;
+
+    // Drain only outside the energy field.
+    if (!inRechargeField && !inBonusRoom && wantsMove && player.energy > 0) {
+      const drainMult = typeof trophyEffects?.energyDrainMultiplier === 'number' && trophyEffects.energyDrainMultiplier > 0
+        ? trophyEffects.energyDrainMultiplier
+        : 1;
+      player.energy = Math.max(0, player.energy - ENERGY_DRAIN_PER_SEC * drainMult * dtSeconds);
     }
 
     // Aim priority:
@@ -2057,7 +2715,7 @@ export function createGame(ui) {
 
       const baseAngle = Math.atan2(player.y - e.y, player.x - e.x);
       const wobble = Math.sin(nowMs / 300 + e.wobblePhase) * 0.8;
-      const speed = e.speed * dtFrames;
+      const speed = e.speed * dtFrames * (enemySpeedMult || 1);
       const desiredX = Math.cos(baseAngle) * speed + Math.cos(baseAngle + Math.PI / 2) * wobble;
       const desiredY = Math.sin(baseAngle) * speed + Math.sin(baseAngle + Math.PI / 2) * wobble;
 
@@ -2128,8 +2786,29 @@ export function createGame(ui) {
             triggerGameOver();
             return;
           }
-          player.x = map.w / 2;
-          player.y = map.h / 2;
+
+          // Losing a life behaves like taking damage: stay in place,
+          // but shove slightly away to avoid immediately re-overlapping.
+          let dx = player.x - e.x;
+          let dy = player.y - e.y;
+          let d = Math.hypot(dx, dy);
+          if (d < 0.001) {
+            const a = now * 0.0037;
+            dx = Math.cos(a);
+            dy = Math.sin(a);
+            d = 1;
+          }
+          dx /= d;
+          dy /= d;
+          const push = player.radius + e.radius + 8;
+          const nx = clamp(player.x + dx * push, player.radius, map.w - player.radius);
+          const ny = clamp(player.y + dy * push, player.radius, map.h - player.radius);
+          const pushed = resolveCircleVsObstacles(nx, ny, player.radius);
+          player.x = pushed.x;
+          player.y = pushed.y;
+
+          player.energy = ENERGY_MAX * 0.2;
+          clearEnergyDock();
         }
       }
     }
@@ -2296,6 +2975,12 @@ export function createGame(ui) {
     };
 
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'e' || e.key === 'E') {
+        if (shouldIgnoreHotkeys()) return;
+        e.preventDefault();
+        if (!e.repeat) requestEnergyDock();
+        return;
+      }
       if (e.key === 'p' || e.key === 'P' || e.code === 'Escape') {
         if (shouldIgnoreHotkeys()) return;
         e.preventDefault();
