@@ -19,6 +19,7 @@ import {
   loadTrophyLevels,
   loadPlayerName,
   loadUltimateType,
+  loadUltimateUpgrades,
   loadMouseAimEnabled,
   loadMaxStartLevel,
   saveCash,
@@ -29,6 +30,7 @@ import {
   saveTrophyLevels,
   savePlayerName,
   saveUltimateType,
+  saveUltimateUpgrades,
 } from './storage.js';
 
 import {
@@ -95,11 +97,13 @@ export function createGame(ui) {
   let leaderboard = loadLeaderboard();
   let achievements = loadAchievements();
   let ownedUltimates = loadOwnedUltimates();
+  let ultimateUpgrades = loadUltimateUpgrades();
 
   function computeTrophyEffects() {
     const effects = {
       startLives: 0,
       powerupDurationBonusMs: 0,
+      powerupDurationByType: {},
       cashMultiplier: 1,
       energyDrainMultiplier: 1,
     };
@@ -113,6 +117,13 @@ export function createGame(ui) {
       if (typeof eff.startLives === 'number') effects.startLives += eff.startLives * level;
       if (typeof eff.powerupDurationBonusMs === 'number') {
         effects.powerupDurationBonusMs += eff.powerupDurationBonusMs * level;
+      }
+      if (eff.powerupDurationByType && typeof eff.powerupDurationByType === 'object') {
+        for (const [type, bonusMs] of Object.entries(eff.powerupDurationByType)) {
+          const ms = Number(bonusMs);
+          if (!Number.isFinite(ms) || ms === 0) continue;
+          effects.powerupDurationByType[type] = (effects.powerupDurationByType[type] || 0) + ms * level;
+        }
       }
       if (typeof eff.cashMultiplier === 'number' && eff.cashMultiplier > 0) {
         effects.cashMultiplier *= eff.cashMultiplier ** level;
@@ -269,7 +280,11 @@ export function createGame(ui) {
   const ENERGY_AUTO_DOCK_IDLE_MS = 650;
   const ENERGY_CONNECT_MS = 2000;
   const ENERGY_RECHARGE_MS = 4000;
+  const ENERGY_TOUCH_PAD = 14; // Docking UX tolerances (helps mobile stick drift + "almost touching" cases).
+  const ENERGY_CONNECT_MOVE_EPS = 0.85; // world-units per frame (~60fps baseline)
 
+  // Visual hint: when we hit full energy, tell the 3D renderer to do a brief surge.
+  let energyFullFxUntilMs = 0;
   // Global enemy slow (from STASIS powerup)
   let enemySpeedMult = 1;
 
@@ -609,7 +624,7 @@ export function createGame(ui) {
       if (!obstacleHasCrystals(r, i)) continue;
 
       // Must be physically touching the asteroid.
-      const touch = circleIntersectsRect(player.x, player.y, player.radius + 4, r);
+      const touch = circleIntersectsRect(player.x, player.y, player.radius + ENERGY_TOUCH_PAD, r);
       if (!touch) continue;
 
       const ox = r.x + Math.max(1, r.w) / 2;
@@ -654,7 +669,7 @@ export function createGame(ui) {
     dockAutoEligibleSinceMs = -Infinity;
     dockRequested = false;
 
-    showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTING — HOLD STILL', ENERGY_CONNECT_MS);
+    showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTING…', ENERGY_CONNECT_MS);
   }
 
   function isPlayerTouchingDockObstacle() {
@@ -663,7 +678,7 @@ export function createGame(ui) {
     const r = currentMap?.obstacles?.[idx];
     if (!r) return false;
     if (!obstacleHasCrystals(r, idx)) return false;
-    return circleIntersectsRect(player.x, player.y, player.radius + 4, r);
+    return circleIntersectsRect(player.x, player.y, player.radius + ENERGY_TOUCH_PAD, r);
   }
 
   function isPlayerInsideDockField() {
@@ -697,15 +712,6 @@ export function createGame(ui) {
       const canDockHere = !!target && player.energy < ENERGY_MAX - 0.01;
       if (canDockHere) {
         const energyRatio = clamp(player.energy / ENERGY_MAX, 0, 1);
-
-        // Prompt (rate-limited) so players learn the mechanic.
-        if (energyRatio <= 0.75 && nowMs - dockLastPromptMs > 1200) {
-          dockLastPromptMs = nowMs;
-          const msg = desktopLike
-            ? 'CRYSTAL ASTEROID: PRESS E TO CONNECT'
-            : 'CRYSTAL ASTEROID: STOP TO CONNECT';
-          showCenterMessage(ui.riftToast || ui.centerToast, msg, 700);
-        }
 
         // Touch-friendly auto-dock:
         // On mobile/touch devices, start connecting automatically when the player is still and
@@ -741,6 +747,7 @@ export function createGame(ui) {
 
     if (energyDock.phase === 'connecting') {
       // Player can move to escape, but moving (or stepping away) cancels the connection.
+      // Allow a tiny bit of movement drift (mobile sticks / touch jitter).
       if (wantsMove || !isPlayerTouchingDockObstacle()) {
         clearEnergyDock();
         showCenterMessage(ui.centerToast || ui.riftToast, 'CONNECTION ABORTED', 550);
@@ -775,6 +782,7 @@ export function createGame(ui) {
 
       if (nowMs >= energyDock.chargeEndsAtMs) {
         player.energy = ENERGY_MAX;
+        energyFullFxUntilMs = Math.max(energyFullFxUntilMs, nowMs + 950);
         clearEnergyDock();
         showCenterMessage(ui.centerToast || ui.riftToast, 'ENERGY FULL', 850);
         return;
@@ -962,6 +970,7 @@ export function createGame(ui) {
   const ult = {
     laser: {
       owned: ownedUltimates.has('laser'),
+      upgraded: !!ultimateUpgrades?.laser,
       cooldownMs: 30000,
       lastUsedMs: -Infinity,
       active: false,
@@ -972,6 +981,7 @@ export function createGame(ui) {
     },
     nuke: {
       owned: ownedUltimates.has('nuke'),
+      upgraded: !!ultimateUpgrades?.nuke,
       cooldownMs: 60000,
       lastUsedMs: -Infinity,
       active: false,
@@ -1410,36 +1420,73 @@ export function createGame(ui) {
   function syncUltimateShopUi() {
     const laserPrice = 500;
     const nukePrice = 1500;
+    const laserUpgradePrice = laserPrice * 3;
+    const nukeUpgradePrice = nukePrice * 3;
 
     if (ui.ultLaserBtn) {
       const owned = ult.laser.owned;
-      ui.ultLaserBtn.textContent = owned ? 'LASER OWNED' : `BUY LASER (${laserPrice} CC)`;
-      ui.ultLaserBtn.disabled = owned || cash < laserPrice;
+      const upgraded = !!ult.laser.upgraded;
+      if (!owned) {
+        ui.ultLaserBtn.textContent = `BUY LASER (${laserPrice} CC)`;
+        ui.ultLaserBtn.disabled = cash < laserPrice;
+      } else if (!upgraded) {
+        ui.ultLaserBtn.textContent = `UPGRADE LASER (${laserUpgradePrice} CC)`;
+        ui.ultLaserBtn.disabled = cash < laserUpgradePrice;
+      } else {
+        ui.ultLaserBtn.textContent = 'LASER MK2';
+        ui.ultLaserBtn.disabled = true;
+      }
     }
     if (ui.ultNukeBtn) {
       const owned = ult.nuke.owned;
-      ui.ultNukeBtn.textContent = owned ? 'NUKE OWNED' : `BUY NUKE (${nukePrice} CC)`;
-      ui.ultNukeBtn.disabled = owned || cash < nukePrice;
+      const upgraded = !!ult.nuke.upgraded;
+      if (!owned) {
+        ui.ultNukeBtn.textContent = `BUY NUKE (${nukePrice} CC)`;
+        ui.ultNukeBtn.disabled = cash < nukePrice;
+      } else if (!upgraded) {
+        ui.ultNukeBtn.textContent = `UPGRADE NUKE (${nukeUpgradePrice} CC)`;
+        ui.ultNukeBtn.disabled = cash < nukeUpgradePrice;
+      } else {
+        ui.ultNukeBtn.textContent = 'NUKE MK2';
+        ui.ultNukeBtn.disabled = true;
+      }
     }
   }
 
   function buyUltimate(type) {
     if (type !== 'laser' && type !== 'nuke') return;
-    const price = type === 'laser' ? 500 : 1500;
-    if (cash < price) return;
+    const basePrice = type === 'laser' ? 500 : 1500;
+    const owned = type === 'laser' ? ult.laser.owned : ult.nuke.owned;
+    const upgraded = type === 'laser' ? !!ult.laser.upgraded : !!ult.nuke.upgraded;
 
-    if (type === 'laser' && ult.laser.owned) return;
-    if (type === 'nuke' && ult.nuke.owned) return;
+    // Purchase if not owned, otherwise upgrade once.
+    if (!owned) {
+      if (cash < basePrice) return;
+      cash -= basePrice;
+      cashDirty = true;
+      saveCash(cash);
 
-    cash -= price;
-    cashDirty = true;
-    saveCash(cash);
+      ownedUltimates.add(type);
+      saveOwnedUltimates(ownedUltimates);
 
-    ownedUltimates.add(type);
-    saveOwnedUltimates(ownedUltimates);
+      if (type === 'laser') ult.laser.owned = true;
+      if (type === 'nuke') ult.nuke.owned = true;
+    } else if (!upgraded) {
+      const upgradePrice = basePrice * 3;
+      if (cash < upgradePrice) return;
+      cash -= upgradePrice;
+      cashDirty = true;
+      saveCash(cash);
 
-    if (type === 'laser') ult.laser.owned = true;
-    if (type === 'nuke') ult.nuke.owned = true;
+      ultimateUpgrades = { ...(ultimateUpgrades || { laser: 0, nuke: 0 }) };
+      ultimateUpgrades[type] = 1;
+      saveUltimateUpgrades(ultimateUpgrades);
+
+      if (type === 'laser') ult.laser.upgraded = true;
+      if (type === 'nuke') ult.nuke.upgraded = true;
+    } else {
+      return;
+    }
 
     syncUltimateButtonsVisibility();
     syncUltimateShopUi();
@@ -1472,19 +1519,29 @@ export function createGame(ui) {
     ult.nuke.startedMs = nowMs;
     ult.nuke.lastUsedMs = nowMs;
 
-    // Nuke: clear entire canvas immediately
+    const isMk2 = !!ult.nuke.upgraded;
+
+    // Base NUKE: local blast (smaller area). MK2: clears the whole map.
+    const baseRadius = Math.max(220, Math.min(world.w, world.h) * 0.45) * sizeScale;
+    const radius = isMk2 ? Infinity : baseRadius;
+
     if (enemies.length > 0) {
-      // Reward cash for all enemies killed
-      for (const e of enemies) {
+      for (let i = enemies.length - 1; i >= 0; i--) {
+        const e = enemies[i];
+        const dx = e.x - player.x;
+        const dy = e.y - player.y;
+        const distSq = dx * dx + dy * dy;
+        if (radius !== Infinity && distSq > radius * radius) continue;
+
         addCashForColor(e.color);
-        // Keep particles a bit lighter than a full per-enemy burst
-        if (Math.random() < 0.35) spawnEnemyDeathParticles(e.x, e.y, e.color);
+        if (Math.random() < 0.45) spawnEnemyDeathParticles(e.x, e.y, e.color);
+        enemies.splice(i, 1);
       }
-      enemies = [];
     }
 
-    // Big flash-like burst
-    spawnCircleBurst(player.x, player.y, 'rgba(255,255,255,0.75)', 22, 46);
+    // Big flash-like burst (bigger for MK2)
+    spawnCircleBurst(player.x, player.y, 'rgba(255,255,255,0.78)', isMk2 ? 34 : 22, isMk2 ? 70 : 46);
+    if (!isMk2) spawnCircleBurst(player.x, player.y, 'rgba(0,255,255,0.20)', baseRadius * 0.18, baseRadius * 0.34);
   }
 
   function getNonOverlappingSpawn(spawnRadius = 8 * sizeScale) {
@@ -1859,7 +1916,8 @@ export function createGame(ui) {
     }
 
     const existing = activePowerUps.find((p) => p.type === type);
-    const dur = POWERUP_DURATION_MS + trophyEffects.powerupDurationBonusMs;
+    const perTypeBonus = trophyEffects.powerupDurationByType?.[type] || 0;
+    const dur = POWERUP_DURATION_MS + trophyEffects.powerupDurationBonusMs + perTypeBonus;
     if (existing) existing.endTime = performance.now() + dur;
     else activePowerUps.push({ type, endTime: performance.now() + dur });
   }
@@ -1959,6 +2017,7 @@ export function createGame(ui) {
         map,
         player,
         energyRatio: clamp(player.energy / ENERGY_MAX, 0, 1),
+        energyFullFxUntilMs,
         aimAngle,
         enemies,
         bullets,
@@ -2344,14 +2403,16 @@ export function createGame(ui) {
       const dx = Math.cos(a);
       const dy = Math.sin(a);
       const end = rayToBounds(player.x, player.y, dx, dy, map.w, map.h);
+      const end2 = ult.laser.upgraded ? rayToBounds(player.x, player.y, -dx, -dy, map.w, map.h) : null;
       const hitPad = ult.laser.thickness * 0.6;
 
       for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         if (!isKillableEnemy(e)) continue;
 
-        const dist = distancePointToSegment(e.x, e.y, player.x, player.y, end.x, end.y);
-        if (dist <= e.radius + hitPad) {
+        const d1 = distancePointToSegment(e.x, e.y, player.x, player.y, end.x, end.y);
+        const d2 = end2 ? distancePointToSegment(e.x, e.y, player.x, player.y, end2.x, end2.y) : Infinity;
+        if (Math.min(d1, d2) <= e.radius + hitPad) {
           killEnemyByIndex(i, e.x, e.y);
         }
       }
@@ -2406,7 +2467,9 @@ export function createGame(ui) {
       if (keys.ArrowRight || keys.d) moveX = player.speed * dtFrames;
     }
 
-    const wantsMove = Math.abs(moveX) > 1e-6 || Math.abs(moveY) > 1e-6;
+    const moveMag = Math.hypot(moveX, moveY);
+    // For docking logic, ignore tiny drift.
+    const wantsMove = moveMag > ENERGY_CONNECT_MOVE_EPS;
     updateEnergyDock(nowMs, { wantsMove });
 
     const inRechargeField = energyDock.phase === 'charging';

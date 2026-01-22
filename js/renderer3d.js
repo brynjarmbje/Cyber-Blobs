@@ -1137,6 +1137,98 @@ export function createRenderer3D(glCanvas) {
   capsuleBand.rotation.x = Math.PI / 2;
   capsuleGroup.add(capsuleBand);
 
+  // --- Capsule energy VFX ---
+  function makeChargeSweepTexture(size = 256) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
+
+    // Soft background
+    const bg = ctx.createLinearGradient(0, 0, size, 0);
+    bg.addColorStop(0.0, 'rgba(255,255,255,0)');
+    bg.addColorStop(0.5, 'rgba(255,255,255,0.06)');
+    bg.addColorStop(1.0, 'rgba(255,255,255,0)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, size, size);
+
+    // Bright vertical streaks (wrap around U), reads like energy scanning.
+    for (let i = 0; i < 7; i++) {
+      const x = (i / 7) * size + (rand2(i * 19.3, 77.1) - 0.5) * 14;
+      const w = 10 + rand2(i * 13.7, 19.9) * 18;
+      const g = ctx.createLinearGradient(x - w, 0, x + w, 0);
+      g.addColorStop(0.0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.45, 'rgba(255,255,255,0.0)');
+      g.addColorStop(0.50, 'rgba(255,255,255,0.95)');
+      g.addColorStop(0.55, 'rgba(255,255,255,0.0)');
+      g.addColorStop(1.0, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, size, size);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.repeat.set(2.5, 1);
+    tex.anisotropy = 2;
+    return tex;
+  }
+
+  const chargeSweepTex = makeChargeSweepTexture(256);
+  const capsuleChargePulseMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xffffff),
+    map: chargeSweepTex,
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const capsuleChargePulseGeo = new THREE.TorusGeometry(1.08, 0.16, 12, 64);
+  const capsuleChargePulse = new THREE.Mesh(capsuleChargePulseGeo, capsuleChargePulseMat);
+  capsuleChargePulse.renderOrder = 62;
+  capsuleChargePulse.position.set(0, 0, 0.82);
+  capsuleChargePulse.rotation.x = Math.PI / 2;
+  capsuleChargePulse.visible = false;
+  capsuleGroup.add(capsuleChargePulse);
+
+  const capsuleLowEnergyMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xff4d6d),
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+  });
+  const capsuleLowEnergyGeo = new THREE.TorusGeometry(1.16, 0.055, 10, 52);
+  const capsuleLowEnergyRing = new THREE.Mesh(capsuleLowEnergyGeo, capsuleLowEnergyMat);
+  capsuleLowEnergyRing.renderOrder = 62;
+  capsuleLowEnergyRing.position.set(0, 0, 0.62);
+  capsuleLowEnergyRing.rotation.x = Math.PI / 2;
+  capsuleLowEnergyRing.visible = false;
+  capsuleGroup.add(capsuleLowEnergyRing);
+
+  let lastEnergyRatio = 1;
+  let fullChargePulseUntil = 0;
+
+  const capsuleAuraMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0xffffff),
+    transparent: true,
+    opacity: 0.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: false,
+    side: THREE.BackSide,
+  });
+  const capsuleAuraGeo = new THREE.SphereGeometry(1.35, 18, 14);
+  const capsuleAura = new THREE.Mesh(capsuleAuraGeo, capsuleAuraMat);
+  capsuleAura.renderOrder = 63;
+  capsuleAura.position.set(0, 0, 0.86);
+  capsuleAura.visible = false;
+  capsuleGroup.add(capsuleAura);
+
   // --- Thrusters (4 small RCS jets) ---
   const thrusterGroup = new THREE.Group();
   thrusterGroup.renderOrder = 64;
@@ -1363,12 +1455,23 @@ export function createRenderer3D(glCanvas) {
 
   function render(state) {
     if (!state) return;
-    const { cam, map, world, player, aimAngle, enemies, bullets, powerUps, obstacles, nowMs, bulletRadius, bulletSpeed, nextEnemyPreview, energyRatio } = state;
+    const { cam, map, world, player, aimAngle, enemies, bullets, powerUps, obstacles, nowMs, bulletRadius, bulletSpeed, nextEnemyPreview, energyRatio, energyFullFxUntilMs } = state;
 
     const tNow = nowMs || performance.now();
 
     const er = typeof energyRatio === 'number' ? energyRatio : 1;
     const lowEnergy = er <= 0.25;
+    const lowEnergy30 = er <= 0.30;
+
+    // Trigger a brief "energy surge" when reaching full (fallback if game doesn't pass a pulse window).
+    if (lastEnergyRatio < 0.985 && er >= 0.999) {
+      fullChargePulseUntil = Math.max(fullChargePulseUntil, tNow + 900);
+    }
+    // Preferred: explicit signal from gameplay.
+    if (typeof energyFullFxUntilMs === 'number' && energyFullFxUntilMs > tNow) {
+      fullChargePulseUntil = Math.max(fullChargePulseUntil, energyFullFxUntilMs);
+    }
+    lastEnergyRatio = er;
 
     const cx = cam?.x || 0;
     const cy = cam?.y || 0;
@@ -1409,8 +1512,63 @@ export function createRenderer3D(glCanvas) {
     capsuleInnerGlowMat.color.copy(pCol);
     capsuleBandMat.color.copy(pCol);
     capsuleBandMat.emissive.copy(pCol);
-    // Slight internal spin for life (not dizzy)
-    capsuleInner.rotation.z = tNow / 900;
+
+    // Energy-driven capsule feedback.
+    const baseInner = 0.16 + 0.18 * er;
+    const warnPulse = lowEnergy30 ? (0.5 + 0.5 * Math.sin(tNow / 120)) : 0;
+    const warnFlick = lowEnergy30 ? (0.5 + 0.5 * Math.sin(tNow / 55)) : 0;
+
+    capsuleInnerGlowMat.opacity = baseInner + (lowEnergy30 ? (0.08 + 0.16 * warnPulse) : 0);
+    capsuleBandMat.emissiveIntensity = 0.75 + 0.75 * er + (lowEnergy30 ? 0.55 * warnFlick : 0);
+
+    // Low-energy ring around capsule (under 30%).
+    capsuleLowEnergyRing.visible = lowEnergy30;
+    if (capsuleLowEnergyRing.visible) {
+      // Mix player tint with warning hue.
+      capsuleLowEnergyMat.color.copy(pCol).lerp(new THREE.Color(0xff4d6d), 0.65);
+      capsuleLowEnergyMat.opacity = 0.20 + 0.42 * warnPulse;
+      capsuleLowEnergyRing.scale.setScalar(1.02 + 0.13 * warnPulse);
+      capsuleLowEnergyRing.rotation.z = tNow / 900;
+    } else {
+      capsuleLowEnergyMat.opacity = 0.0;
+    }
+
+    // Full-charge surge pulse.
+    const pulseLeft = fullChargePulseUntil - tNow;
+    if (pulseLeft > 0) {
+      const t = clamp(1.0 - pulseLeft / 900, 0, 1);
+      const ease = 1.0 - Math.pow(1.0 - t, 2);
+      const amp = (1.0 - t) * 0.85;
+      capsuleChargePulse.visible = true;
+      capsuleChargePulseMat.color.copy(pCol).lerp(new THREE.Color(0xffffff), 0.45);
+      capsuleChargePulseMat.opacity = 0.85 * amp;
+      // Animate the sweep texture so it reads like energy flowing.
+      if (capsuleChargePulseMat.map) {
+        capsuleChargePulseMat.map.offset.x = (tNow / 500) % 1;
+        capsuleChargePulseMat.map.needsUpdate = true;
+      }
+      capsuleChargePulse.rotation.z = tNow / 140;
+      capsuleChargePulse.scale.setScalar(1.0 + 0.38 * ease);
+
+      // Big aura shell so it's unmistakable.
+      capsuleAura.visible = true;
+      capsuleAuraMat.color.copy(pCol).lerp(new THREE.Color(0xffffff), 0.55);
+      capsuleAuraMat.opacity = 0.22 * amp;
+      capsuleAura.scale.setScalar(1.0 + 0.28 * ease);
+      capsuleAura.rotation.y = tNow / 650;
+      capsuleAura.rotation.z = tNow / 880;
+
+      // Give the band a quick kick too.
+      capsuleBandMat.emissiveIntensity += 1.55 * amp;
+    } else {
+      capsuleChargePulse.visible = false;
+      capsuleChargePulseMat.opacity = 0.0;
+      capsuleAura.visible = false;
+      capsuleAuraMat.opacity = 0.0;
+    }
+
+    // Slight internal spin for life (not dizzy). Faster when low.
+    capsuleInner.rotation.z = tNow / (lowEnergy30 ? 520 : 900);
 
     // Thrusters: show exhaust opposite movement direction.
     // Prefer true velocity if available; otherwise estimate from delta position.

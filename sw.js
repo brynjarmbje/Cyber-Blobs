@@ -2,13 +2,17 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v41';
+const CACHE_NAME = 'leikur-cache-v73';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [
   './',
   './index.html',
   './style.css',
+  './style.css?v=73',
+  './assets/menu-hero.png',
+  './assets/asteroid-crystal-reactor.png',
+  './assets/menu-hero.jpg',
   './CyberBlob-Theme_V1.mp3',
   './CyberBlob-Menu-Theme.mp3',
   './CyberBlob-SpaceFlow.mp3',
@@ -36,7 +40,16 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
-      await cache.addAll(PRECACHE_URLS);
+      // Cache each URL independently so optional assets don't break SW install.
+      await Promise.allSettled(
+        PRECACHE_URLS.map(async (u) => {
+          try {
+            await cache.add(u);
+          } catch {
+            // ignore
+          }
+        })
+      );
       await self.skipWaiting();
     })()
   );

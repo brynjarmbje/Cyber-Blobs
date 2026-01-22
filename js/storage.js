@@ -177,6 +177,23 @@ export function saveOwnedUltimates(set) {
   localStorage.setItem(STORAGE_KEYS.ultimatesOwned, JSON.stringify(Array.from(set)));
 }
 
+function normalizeUltimateUpgrades(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { laser: 0, nuke: 0 };
+  const laser = raw.laser ? 1 : 0;
+  const nuke = raw.nuke ? 1 : 0;
+  return { laser, nuke };
+}
+
+export function loadUltimateUpgrades() {
+  const raw = safeParseJson(localStorage.getItem(STORAGE_KEYS.ultimateUpgrades), null);
+  return normalizeUltimateUpgrades(raw);
+}
+
+export function saveUltimateUpgrades(upgrades) {
+  const normalized = normalizeUltimateUpgrades(upgrades);
+  localStorage.setItem(STORAGE_KEYS.ultimateUpgrades, JSON.stringify(normalized));
+}
+
 // null = not set yet
 export function loadMouseAimEnabled() {
   const v = localStorage.getItem(STORAGE_KEYS.mouseAim);

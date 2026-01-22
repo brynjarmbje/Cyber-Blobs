@@ -427,16 +427,9 @@ export function renderShop(ui, trophyLevels, cash, onBuyOrUpgrade) {
     desc.className = 'desc';
     desc.textContent = t.desc || '';
 
-    const price = document.createElement('div');
-    price.className = 'price';
-    price.textContent = canUpgrade
-      ? `${owned ? 'Next' : 'Cost'}: ${nextCost} CC`
-      : `MAXED`;
-
     card.appendChild(icon);
     card.appendChild(name);
     card.appendChild(desc);
-    card.appendChild(price);
 
     if (owned) {
       const ownedTag = document.createElement('div');
