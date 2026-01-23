@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 256" preserveAspectRatio="none">
+  <!-- Full outer silhouette used for masking sprite art (no hole). -->
+  <path fill="#fff" d="
+    M 52 128
+    C 52 78 92 42 170 34
+    C 205 30 237 30 256 30
+    C 275 30 307 30 342 34
+    C 420 42 460 78 460 128
+    C 460 178 420 214 342 222
+    C 307 226 275 226 256 226
+    C 237 226 205 226 170 222
+    C 92 214 52 178 52 128
+    Z
+  "/>
+</svg>

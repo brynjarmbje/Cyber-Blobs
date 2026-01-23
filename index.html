@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css?v=73">
+  <link rel="stylesheet" href="style.css?v=94">
 </head>
 <body>
 
@@ -27,23 +27,18 @@
 
     <div class="mainMenuActions" role="group" aria-label="Main menu actions">
       <button id="mainPlayBtn" class="mainMenuBtn mainMenuBtn--play" type="button">
-        <span class="mmIcon" aria-hidden="true"></span>
         <span class="mmText">PLAY</span>
       </button>
       <button id="mainShopBtn" class="mainMenuBtn mainMenuBtn--shop" type="button">
-        <span class="mmIcon" aria-hidden="true"></span>
         <span class="mmText">SHOP</span>
       </button>
       <button id="mainBoardBtn" class="mainMenuBtn mainMenuBtn--board" type="button">
-        <span class="mmIcon" aria-hidden="true"></span>
         <span class="mmText">LEADERBOARD</span>
       </button>
       <button id="mainSettingsBtn" class="mainMenuBtn mainMenuBtn--settings" type="button">
-        <span class="mmIcon" aria-hidden="true"></span>
         <span class="mmText">SETTINGS</span>
       </button>
       <button id="mainAboutBtn" class="mainMenuBtn mainMenuBtn--about" type="button">
-        <span class="mmIcon" aria-hidden="true"></span>
         <span class="mmText">ABOUT</span>
       </button>
     </div>
@@ -55,8 +50,13 @@
 <div id="app">
   <header id="topBar">
     <div class="brand">
-      <div class="brandTitle">Cyber Yolks</div>
-      <div class="brandSub">Survive.</div>
+      <div class="brandLockup" aria-label="Cyber Yolks">
+        <div class="brandTitle">
+          <span class="t1">CYBER</span>
+          <span class="t2">YOLKS</span>
+        </div>
+        <div class="brandSub brandSub--header">Survive.</div>
+      </div>
     </div>
 
     <div class="hudRow" role="status" aria-label="Game HUD">

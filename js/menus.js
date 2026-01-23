@@ -92,6 +92,279 @@ export function installMenuBindings(
     onSettingsAimToggle,
   } = {}
 ) {
+  function isAudioEnabled() {
+    // Reuse the music toggle as the global audio toggle.
+    const btn = ui?.musicBtn;
+    if (!btn) return true;
+    return btn.getAttribute('aria-pressed') !== 'false';
+  }
+
+  function createPlopSynth() {
+    /** @type {AudioContext|null} */
+    let ctx = null;
+
+    function ensureCtx() {
+      if (ctx) return ctx;
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ctx = new AC();
+      return ctx;
+    }
+
+    function play() {
+      if (!isAudioEnabled()) return;
+      const c = ensureCtx();
+      if (!c) return;
+
+      // Resume if needed (mobile autoplay policy).
+      if (c.state === 'suspended') {
+        try {
+          void c.resume();
+        } catch {
+          // ignore
+        }
+      }
+
+      const now = c.currentTime;
+
+      // A tiny percussive "plop": falling pitch + short noise puff.
+      const master = c.createGain();
+      master.gain.setValueAtTime(0.0001, now);
+      master.gain.exponentialRampToValueAtTime(0.16, now + 0.006);
+      master.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(1200, now);
+      lp.frequency.exponentialRampToValueAtTime(520, now + 0.10);
+
+      // Tone
+      const osc = c.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(240, now);
+      osc.frequency.exponentialRampToValueAtTime(92, now + 0.10);
+
+      const oscGain = c.createGain();
+      oscGain.gain.setValueAtTime(0.0001, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.32, now + 0.004);
+      oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.10);
+
+      // Noise puff (very short)
+      const noiseLen = Math.floor(c.sampleRate * 0.05);
+      const noiseBuf = c.createBuffer(1, noiseLen, c.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) {
+        const t = i / data.length;
+        const env = Math.max(0, 1 - t) ** 2;
+        data[i] = (Math.random() * 2 - 1) * env;
+      }
+      const noise = c.createBufferSource();
+      noise.buffer = noiseBuf;
+
+      const noiseGain = c.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.10, now + 0.003);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.05);
+
+      // Wire
+      osc.connect(oscGain);
+      oscGain.connect(lp);
+
+      noise.connect(noiseGain);
+      noiseGain.connect(lp);
+
+      lp.connect(master);
+      master.connect(c.destination);
+
+      try {
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } catch {
+        // ignore
+      }
+      try {
+        noise.start(now);
+        noise.stop(now + 0.06);
+      } catch {
+        // ignore
+      }
+    }
+
+    return { play };
+  }
+
+  const plop = createPlopSynth();
+
+  function createAlphaHitTester(imgSrc) {
+    /** @type {{ ready: boolean, w: number, h: number, canvas: HTMLCanvasElement|null, ctx: CanvasRenderingContext2D|null }} */
+    const state = { ready: false, w: 0, h: 0, canvas: null, ctx: null };
+
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = imgSrc;
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || 0;
+        const h = img.naturalHeight || 0;
+        if (!w || !h) return;
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0);
+        state.ready = true;
+        state.w = w;
+        state.h = h;
+        state.canvas = c;
+        state.ctx = ctx;
+      } catch {
+        // ignore
+      }
+    };
+
+    function parsePx(v) {
+      const n = Number(String(v || '').replace('px', '').trim());
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function getBeforeSizePx(el) {
+      // Read the pseudo-element size so we match the rendered art layer.
+      const cs = getComputedStyle(el, '::before');
+      const w = parsePx(cs.width);
+      const h = parsePx(cs.height);
+      if (!w || !h) return null;
+      return { w, h };
+    }
+
+    function hitTest(el, clientX, clientY, { alphaThreshold = 12 } = {}) {
+      if (!state.ready || !state.ctx) return true; // fail-open
+
+      const btnRect = el.getBoundingClientRect();
+      const beforeSize = getBeforeSizePx(el);
+      if (!beforeSize) return true;
+
+      const beforeW = beforeSize.w;
+      const beforeH = beforeSize.h;
+
+      const cx = btnRect.left + btnRect.width / 2;
+      const cy = btnRect.top + btnRect.height / 2;
+      const beforeLeft = cx - beforeW / 2;
+      const beforeTop = cy - beforeH / 2;
+
+      // Contain-fit math (same as CSS background-size: contain; background-position: center)
+      const scale = Math.min(beforeW / state.w, beforeH / state.h);
+      const drawW = state.w * scale;
+      const drawH = state.h * scale;
+      const offX = (beforeW - drawW) / 2;
+      const offY = (beforeH - drawH) / 2;
+
+      const localX = (clientX - (beforeLeft + offX)) / scale;
+      const localY = (clientY - (beforeTop + offY)) / scale;
+
+      if (localX < 0 || localY < 0 || localX >= state.w || localY >= state.h) return false;
+
+      const ix = Math.max(0, Math.min(state.w - 1, Math.floor(localX)));
+      const iy = Math.max(0, Math.min(state.h - 1, Math.floor(localY)));
+
+      try {
+        const d = state.ctx.getImageData(ix, iy, 1, 1).data;
+        const a = d[3] || 0;
+        return a >= alphaThreshold;
+      } catch {
+        return true;
+      }
+    }
+
+    return { hitTest };
+  }
+
+  const playAlphaHit = createAlphaHitTester('./assets/PLAY-button_yolk.png');
+  const shopAlphaHit = createAlphaHitTester('./assets/Shop-button_Yolk.png');
+  const boardAlphaHit = createAlphaHitTester('./assets/leaderboard-button_yolk.png');
+  const settingsAlphaHit = createAlphaHitTester('./assets/settings-button_yolk.png');
+  const aboutAlphaHit = createAlphaHitTester('./assets/about-button_yolk.png');
+
+  function installMenuBtnFX(btn, { wobbleChance = 0.25, hitTest } = {}) {
+    if (!btn) return;
+
+    let acceptedPress = false;
+
+    const clearFxClasses = () => {
+      btn.classList.remove('isPressed');
+      btn.classList.remove('isBouncing');
+      btn.classList.remove('isWobble');
+    };
+
+    btn.addEventListener(
+      'pointerdown',
+      (e) => {
+        acceptedPress = false;
+        if (typeof hitTest === 'function') {
+          const ok = hitTest(e);
+          if (!ok) {
+            try {
+              e.preventDefault();
+              e.stopPropagation();
+            } catch {
+              // ignore
+            }
+            return;
+          }
+        }
+
+        acceptedPress = true;
+        btn.classList.remove('isBouncing');
+        btn.classList.remove('isWobble');
+        btn.classList.add('isPressed');
+        plop.play();
+      },
+      { passive: false }
+    );
+
+    const release = () => {
+      if (!acceptedPress) return;
+      btn.classList.remove('isPressed');
+
+      // Add bounce (and occasionally a tiny wobble) on release.
+      btn.classList.remove('isBouncing');
+      // Force restart animation.
+      void btn.offsetWidth;
+      btn.classList.add('isBouncing');
+
+      const doWobble = Math.random() < wobbleChance;
+      if (doWobble) {
+        btn.classList.remove('isWobble');
+        void btn.offsetWidth;
+        btn.classList.add('isWobble');
+      }
+    };
+
+    btn.addEventListener('pointerup', release, { passive: true });
+    btn.addEventListener('pointercancel', clearFxClasses, { passive: true });
+    btn.addEventListener('pointerleave', clearFxClasses, { passive: true });
+
+    btn.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      btn.classList.add('isPressed');
+      plop.play();
+    });
+    btn.addEventListener('keyup', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      release();
+    });
+
+    btn.addEventListener(
+      'animationend',
+      () => {
+        btn.classList.remove('isBouncing');
+        btn.classList.remove('isWobble');
+      },
+      { passive: true }
+    );
+  }
+
   // When level select is opened from the Game Over screen, closing it should
   // return to a sensible place (main menu) instead of leaving the game in limbo.
   let levelSelectOpenedFromGameOver = false;
@@ -208,6 +481,27 @@ export function installMenuBindings(
   });
 
   // Main menu buttons
+  installMenuBtnFX(ui.mainPlayBtn, {
+    wobbleChance: 0.35,
+    hitTest: (e) => playAlphaHit.hitTest(ui.mainPlayBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+  });
+  installMenuBtnFX(ui.mainShopBtn, {
+    wobbleChance: 0.20,
+    hitTest: (e) => shopAlphaHit.hitTest(ui.mainShopBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+  });
+  installMenuBtnFX(ui.mainBoardBtn, {
+    wobbleChance: 0.22,
+    hitTest: (e) => boardAlphaHit.hitTest(ui.mainBoardBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+  });
+  installMenuBtnFX(ui.mainSettingsBtn, {
+    wobbleChance: 0.18,
+    hitTest: (e) => settingsAlphaHit.hitTest(ui.mainSettingsBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+  });
+  installMenuBtnFX(ui.mainAboutBtn, {
+    wobbleChance: 0.18,
+    hitTest: (e) => aboutAlphaHit.hitTest(ui.mainAboutBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+  });
+
   ui.mainPlayBtn?.addEventListener('click', () => {
     const maxStart = typeof getMaxStartLevelUnlocked === 'function' ? getMaxStartLevelUnlocked() : 0;
     if (maxStart >= 10 && typeof openLevelSelect === 'function') openLevelSelect({ allowBackToMenu: true });

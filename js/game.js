@@ -1154,17 +1154,29 @@ export function createGame(ui) {
     let ny = y;
     let hit = false;
 
+    const maxX = Math.max(radius, map.w - radius);
+    const maxY = Math.max(radius, map.h - radius);
+
     // A couple passes helps with corners.
     for (let pass = 0; pass < 2; pass++) {
+      nx = clamp(nx, radius, maxX);
+      ny = clamp(ny, radius, maxY);
       for (const r of currentMap.obstacles) {
         const res = resolveCircleVsRect(nx, ny, radius, r);
         if (res.hit) {
           nx = res.x;
           ny = res.y;
           hit = true;
+
+          // If an obstacle pushes us out toward the map edge, keep it in-bounds.
+          nx = clamp(nx, radius, maxX);
+          ny = clamp(ny, radius, maxY);
         }
       }
     }
+
+    nx = clamp(nx, radius, maxX);
+    ny = clamp(ny, radius, maxY);
     return { x: nx, y: ny, hit };
   }
 
@@ -1776,11 +1788,18 @@ export function createGame(ui) {
   }
 
   function separateEnemies() {
-    const repulsionFactor = 2.0;
+    const baseRepulsionFactor = 2.0;
+    const priorityRepulsionFactor = 2.35;
+    const priorityPushShare = 0.25;
+    const otherPushShare = 1 - priorityPushShare;
     for (let i = 0; i < enemies.length; i++) {
       for (let j = i + 1; j < enemies.length; j++) {
         const e1 = enemies[i];
         const e2 = enemies[j];
+
+        const e1Priority = isKillableEnemy(e1);
+        const e2Priority = isKillableEnemy(e2);
+        const repulsionFactor = e1Priority !== e2Priority ? priorityRepulsionFactor : baseRepulsionFactor;
 
         const dx = e2.x - e1.x;
         const dy = e2.y - e1.y;
@@ -1792,15 +1811,20 @@ export function createGame(ui) {
         if (distSq < desiredDistSq) {
           const dist = Math.sqrt(distSq) || 0.001;
           const overlap = desiredDist - dist;
-          const push = overlap / 2;
+          const push = overlap;
 
           const ux = dx / dist;
           const uy = dy / dist;
 
-          e1.x -= ux * push;
-          e1.y -= uy * push;
-          e2.x += ux * push;
-          e2.y += uy * push;
+          // If one enemy is the current killable "food" target, let it shove through the crowd.
+          // Priority enemy moves less; other enemy yields more.
+          const e1Share = e1Priority && !e2Priority ? priorityPushShare : e2Priority && !e1Priority ? otherPushShare : 0.5;
+          const e2Share = 1 - e1Share;
+
+          e1.x -= ux * push * e1Share;
+          e1.y -= uy * push * e1Share;
+          e2.x += ux * push * e2Share;
+          e2.y += uy * push * e2Share;
         }
       }
     }
@@ -2178,22 +2202,35 @@ export function createGame(ui) {
       const dx = Math.cos(a);
       const dy = Math.sin(a);
       const end = rayToBounds(player.x, player.y, dx, dy, map.w, map.h);
+      const isMk2 = !!ult.laser.upgraded;
+      const end2 = isMk2 ? rayToBounds(player.x, player.y, -dx, -dy, map.w, map.h) : null;
 
       // main beam
       ctx.save();
-      ctx.globalAlpha = 0.75 * (1 - t * 0.25);
+      const beamAlpha = 0.75 * (1 - t * 0.25);
       ctx.shadowColor = 'rgba(0,255,255,0.9)';
       ctx.shadowBlur = 22;
       ctx.strokeStyle = 'rgba(0,255,255,0.95)';
       ctx.lineCap = 'round';
       ctx.lineWidth = ult.laser.thickness;
+
+      ctx.globalAlpha = beamAlpha;
       ctx.beginPath();
       ctx.moveTo(player.x, player.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
 
+      if (end2) {
+        ctx.globalAlpha = beamAlpha * 0.95;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(end2.x, end2.y);
+        ctx.stroke();
+      }
+
       // inner hot core
-      ctx.globalAlpha = 0.55;
+      const coreAlpha = 0.55;
+      ctx.globalAlpha = coreAlpha;
       ctx.shadowBlur = 0;
       ctx.strokeStyle = 'rgba(255,255,255,0.9)';
       ctx.lineWidth = Math.max(2, ult.laser.thickness * 0.35);
@@ -2201,6 +2238,14 @@ export function createGame(ui) {
       ctx.moveTo(player.x, player.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
+
+      if (end2) {
+        ctx.globalAlpha = coreAlpha * 0.95;
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y);
+        ctx.lineTo(end2.x, end2.y);
+        ctx.stroke();
+      }
       ctx.restore();
     }
 
@@ -2778,7 +2823,9 @@ export function createGame(ui) {
 
       const baseAngle = Math.atan2(player.y - e.y, player.x - e.x);
       const wobble = Math.sin(nowMs / 300 + e.wobblePhase) * 0.8;
-      const speed = e.speed * dtFrames * (enemySpeedMult || 1);
+      const isPriority = isKillableEnemy(e);
+      const prioritySpeedMult = 1.18;
+      const speed = e.speed * dtFrames * (enemySpeedMult || 1) * (isPriority ? prioritySpeedMult : 1);
       const desiredX = Math.cos(baseAngle) * speed + Math.cos(baseAngle + Math.PI / 2) * wobble;
       const desiredY = Math.sin(baseAngle) * speed + Math.sin(baseAngle + Math.PI / 2) * wobble;
 
