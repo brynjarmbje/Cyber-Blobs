@@ -2,20 +2,20 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v94';
+const CACHE_NAME = 'leikur-cache-v107';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [
   './',
   './index.html',
   './style.css',
-  './style.css?v=94',
-  './assets/PLAY-button_yolk.png',
-  './assets/Shop-button_Yolk.png',
-  './assets/leaderboard-button_yolk.png',
-  './assets/settings-button_yolk.png',
-  './assets/about-button_yolk.png',
-  './assets/Close-button_yolk.png',
+  './style.css?v=107',
+  './assets/play_cyberyolk_button.png',
+  './assets/shop_button_cyberyolk.png',
+  './assets/leaderboard_button_cyberyolk.png',
+  './assets/settings_button_cyberyolk.png',
+  './assets/about_button_cyberyolk.png',
+  './assets/close_button_cyberyolk.png',
   './assets/yolk_btn_rim.svg',
   './assets/yolk_btn_core.svg',
   './assets/menu-hero.png',

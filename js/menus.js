@@ -280,11 +280,12 @@ export function installMenuBindings(
     return { hitTest };
   }
 
-  const playAlphaHit = createAlphaHitTester('./assets/PLAY-button_yolk.png');
-  const shopAlphaHit = createAlphaHitTester('./assets/Shop-button_Yolk.png');
-  const boardAlphaHit = createAlphaHitTester('./assets/leaderboard-button_yolk.png');
-  const settingsAlphaHit = createAlphaHitTester('./assets/settings-button_yolk.png');
-  const aboutAlphaHit = createAlphaHitTester('./assets/about-button_yolk.png');
+  const playAlphaHit = createAlphaHitTester('./assets/play_cyberyolk_button.png');
+  const shopAlphaHit = createAlphaHitTester('./assets/shop_button_cyberyolk.png');
+  const boardAlphaHit = createAlphaHitTester('./assets/leaderboard_button_cyberyolk.png');
+  const settingsAlphaHit = createAlphaHitTester('./assets/settings_button_cyberyolk.png');
+  const aboutAlphaHit = createAlphaHitTester('./assets/about_button_cyberyolk.png');
+  const closeAlphaHit = createAlphaHitTester('./assets/close_button_cyberyolk.png');
 
   function installMenuBtnFX(btn, { wobbleChance = 0.25, hitTest } = {}) {
     if (!btn) return;
@@ -501,6 +502,8 @@ export function installMenuBindings(
     wobbleChance: 0.18,
     hitTest: (e) => aboutAlphaHit.hitTest(ui.mainAboutBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
   });
+
+  // Modal close buttons use the standard mini button styling (no yolk art / no alpha hit-testing).
 
   ui.mainPlayBtn?.addEventListener('click', () => {
     const maxStart = typeof getMaxStartLevelUnlocked === 'function' ? getMaxStartLevelUnlocked() : 0;
