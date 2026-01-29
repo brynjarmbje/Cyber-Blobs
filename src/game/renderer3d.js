@@ -1078,30 +1078,100 @@ export function createRenderer3D(glCanvas) {
     opacity: 0.22,
   });
 
-  // Faceted capsule pieces in unit space (scaled by player.radius later)
-  const capSides = 7;
-  const bodyGeo = new THREE.CylinderGeometry(0.88, 0.88, 2.05, capSides, 1, false);
-  bodyGeo.rotateX(Math.PI / 2);
-  const noseGeo = new THREE.ConeGeometry(0.88, 0.75, capSides, 1, false);
-  noseGeo.rotateX(Math.PI / 2);
-  noseGeo.rotateZ(Math.PI);
-  const tailGeo = new THREE.ConeGeometry(0.88, 0.75, capSides, 1, false);
-  tailGeo.rotateX(Math.PI / 2);
+  // --- New capsule design (still lightweight): metallic hull + tinted glass canopy + neon seams.
+  function makeCapsuleSeamTexture(size = 256) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
 
-  const capsuleBody = new THREE.Mesh(bodyGeo, capsuleCrystalMat);
-  capsuleBody.position.set(0, 0, 0.88);
-  capsuleBody.renderOrder = 61;
-  capsuleGroup.add(capsuleBody);
+    // Base subtle noise-ish banding (reads like brushed panels when wrapped).
+    for (let y = 0; y < size; y += 2) {
+      const a = 0.03 + 0.04 * (0.5 + 0.5 * Math.sin(y * 0.22));
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.fillRect(0, y, size, 1);
+    }
 
-  const capsuleNose = new THREE.Mesh(noseGeo, capsuleCrystalMat);
-  capsuleNose.position.set(0.00, 0.00, 1.98);
-  capsuleNose.renderOrder = 61;
-  capsuleGroup.add(capsuleNose);
+    // Thin seam lines along U (wrap direction)
+    ctx.globalAlpha = 0.8;
+    for (let i = 0; i < 6; i++) {
+      const x = (i / 6) * size + 8;
+      const w = 2;
+      const g = ctx.createLinearGradient(x, 0, x + w, 0);
+      g.addColorStop(0, 'rgba(255,255,255,0)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0.9)');
+      g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - 10, 0, 20, size);
+    }
 
-  const capsuleTail = new THREE.Mesh(tailGeo, capsuleCrystalMat);
-  capsuleTail.position.set(0.00, 0.00, -0.22);
-  capsuleTail.renderOrder = 61;
-  capsuleGroup.add(capsuleTail);
+    // Small circuit ticks
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    for (let i = 0; i < 36; i++) {
+      const x = (rand2(i * 31.7, 9.2) * 0.9 + 0.05) * size;
+      const y = (rand2(i * 17.3, 41.1) * 0.9 + 0.05) * size;
+      const w = 4 + Math.floor(rand2(i * 11.1, 77.7) * 9);
+      const h = 1 + Math.floor(rand2(i * 19.9, 13.3) * 2);
+      ctx.fillRect(x, y, w, h);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(2.6, 1.0);
+    tex.anisotropy = 2;
+    return tex;
+  }
+
+  const capsuleSeamTex = makeCapsuleSeamTexture(256);
+  const capsuleHullMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0x0e1422),
+    roughness: 0.26,
+    metalness: 0.85,
+    clearcoat: 1.0,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1.4,
+    emissive: new THREE.Color(0xffffff),
+    emissiveMap: capsuleSeamTex,
+    emissiveIntensity: 0.20,
+  });
+
+  // Prefer CapsuleGeometry when available; otherwise fall back to a cylinder (still looks OK).
+  const hullGeo = THREE.CapsuleGeometry
+    ? new THREE.CapsuleGeometry(0.86, 1.18, 6, 16)
+    : new THREE.CylinderGeometry(0.86, 0.86, 2.90, 16, 1, false);
+  hullGeo.rotateX(Math.PI / 2);
+
+  const capsuleHull = new THREE.Mesh(hullGeo, capsuleHullMat);
+  capsuleHull.position.set(0, 0, 0.88);
+  capsuleHull.renderOrder = 61;
+  capsuleGroup.add(capsuleHull);
+
+  // Tinted canopy (glass)
+  const canopyGeo = new THREE.SphereGeometry(0.62, 18, 14);
+  const capsuleCanopy = new THREE.Mesh(canopyGeo, capsuleCrystalMat);
+  capsuleCanopy.position.set(0.0, 0.16, 1.32);
+  capsuleCanopy.scale.set(1.0, 0.78, 1.08);
+  capsuleCanopy.renderOrder = 62;
+  capsuleGroup.add(capsuleCanopy);
+
+  // Canopy rim (reads top-down)
+  const canopyRimGeo = new THREE.TorusGeometry(0.58, 0.055, 10, 42);
+  const canopyRimMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(0xffffff),
+    roughness: 0.28,
+    metalness: 0.7,
+    emissive: new THREE.Color(0xffffff),
+    emissiveIntensity: 0.55,
+  });
+  const canopyRim = new THREE.Mesh(canopyRimGeo, canopyRimMat);
+  canopyRim.position.set(0.0, 0.10, 1.14);
+  canopyRim.rotation.x = Math.PI / 2;
+  canopyRim.renderOrder = 62;
+  capsuleGroup.add(canopyRim);
 
   const innerGeo = new THREE.IcosahedronGeometry(0.66, 0);
   const capsuleInner = new THREE.Mesh(innerGeo, capsuleInnerGlowMat);
@@ -1112,15 +1182,9 @@ export function createRenderer3D(glCanvas) {
   const capsuleEdges = new THREE.Group();
   capsuleEdges.renderOrder = 63;
   capsuleGroup.add(capsuleEdges);
-  const eBody = new THREE.LineSegments(new THREE.EdgesGeometry(bodyGeo, 12), capsuleEdgeMat);
-  const eNose = new THREE.LineSegments(new THREE.EdgesGeometry(noseGeo, 12), capsuleEdgeMat);
-  const eTail = new THREE.LineSegments(new THREE.EdgesGeometry(tailGeo, 12), capsuleEdgeMat);
-  eBody.position.copy(capsuleBody.position);
-  eNose.position.copy(capsuleNose.position);
-  eTail.position.copy(capsuleTail.position);
-  capsuleEdges.add(eBody);
-  capsuleEdges.add(eNose);
-  capsuleEdges.add(eTail);
+  const eHull = new THREE.LineSegments(new THREE.EdgesGeometry(hullGeo, 18), capsuleEdgeMat);
+  eHull.position.copy(capsuleHull.position);
+  capsuleEdges.add(eHull);
 
   // Glowing mid-band to make the capsule read better top-down.
   const capsuleBandGeo = new THREE.TorusGeometry(0.92, 0.08, 10, 40);
@@ -1136,6 +1200,57 @@ export function createRenderer3D(glCanvas) {
   capsuleBand.position.set(0, 0, 0.82);
   capsuleBand.rotation.x = Math.PI / 2;
   capsuleGroup.add(capsuleBand);
+
+  // Optional: use the 2D capsule artwork if present.
+  // This keeps the existing VFX rings/aura/cannon/thrusters, but swaps the hull visuals.
+  // If the asset fails to load, we keep the procedural capsule.
+  const capsuleBaseMeshes = [capsuleHull, capsuleCanopy, canopyRim, capsuleInner, capsuleEdges, capsuleBand];
+  try {
+    const loader = new THREE.TextureLoader();
+    loader.load(
+      './assets/Capsule_CyberYolks.png',
+      (tex) => {
+        try {
+          tex.colorSpace = THREE.SRGBColorSpace;
+        } catch {
+          // ignore (older three)
+        }
+        tex.anisotropy = 2;
+
+        const mat = new THREE.MeshBasicMaterial({
+          map: tex,
+          transparent: true,
+          opacity: 1.0,
+          depthWrite: false,
+          depthTest: false,
+        });
+        mat.alphaTest = 0.02;
+
+        // Sprite is 1024x1024 with padding; use a square plane.
+        // Make ONLY the image bigger (turret/thrusters/VFX stay at rig scale).
+        const geo = new THREE.PlaneGeometry(3.75, 3.75);
+        const sprite = new THREE.Mesh(geo, mat);
+        sprite.renderOrder = 61;
+        sprite.position.set(0, 0, 0.88);
+        capsuleGroup.add(sprite);
+        capsuleGroup.userData.capsuleSprite = sprite;
+
+        for (const m of capsuleBaseMeshes) {
+          if (m) m.visible = false;
+        }
+      },
+      undefined,
+      () => {
+        // ignore (fallback to procedural capsule)
+      }
+    );
+  } catch {
+    // ignore
+  }
+
+  // Expose materials we want to drive in render()
+  capsuleGroup.userData.hullMat = capsuleHullMat;
+  capsuleGroup.userData.canopyRimMat = canopyRimMat;
 
   // --- Capsule energy VFX ---
   function makeChargeSweepTexture(size = 256) {
@@ -1229,73 +1344,113 @@ export function createRenderer3D(glCanvas) {
   capsuleAura.visible = false;
   capsuleGroup.add(capsuleAura);
 
-  // --- Thrusters (4 small RCS jets) ---
+  // --- Thruster fire VFX ---
+  // The capsule artwork contains the thruster hardware; we only render animated fire.
   const thrusterGroup = new THREE.Group();
   thrusterGroup.renderOrder = 64;
   playerGroup.add(thrusterGroup);
 
-  const thrusterNozzleMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(0x4b5563),
-    roughness: 0.45,
-    metalness: 0.55,
-    emissive: new THREE.Color(0x0a0c10),
-    emissiveIntensity: 0.35,
-  });
-  const flameMat = new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0x66ccff),
-    transparent: true,
-    opacity: 0.0,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-    depthTest: false,
-  });
+  function makeFlameTexture(size = 128) {
+    const c = document.createElement('canvas');
+    c.width = size;
+    c.height = size;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, size, size);
 
-  const nozzleGeo = new THREE.CylinderGeometry(0.18, 0.24, 0.30, 12);
-  nozzleGeo.rotateX(Math.PI / 2);
+    // Flame stretched along +X with a bright core and softer outer falloff.
+    const g = ctx.createLinearGradient(0, size * 0.5, size, size * 0.5);
+    g.addColorStop(0.00, 'rgba(255,255,255,0.00)');
+    g.addColorStop(0.06, 'rgba(180,240,255,0.90)');
+    g.addColorStop(0.22, 'rgba(120,210,255,0.70)');
+    g.addColorStop(0.65, 'rgba(40,120,255,0.18)');
+    g.addColorStop(1.00, 'rgba(0,0,0,0.00)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
 
-  // Flame geometry: move cone so its base starts at the origin.
-  // This makes it easy to place the flame exactly at the nozzle opening.
-  const FLAME_R = 0.18;
-  const FLAME_H = 0.70;
-  const flameGeo = new THREE.ConeGeometry(FLAME_R, FLAME_H, 12);
-  flameGeo.translate(0, FLAME_H * 0.5, 0);
+    // Tight core
+    const core = ctx.createRadialGradient(size * 0.18, size * 0.5, 0, size * 0.18, size * 0.5, size * 0.22);
+    core.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+    core.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(size * 0.18, size * 0.5, size * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = 'source-over';
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = THREE.ClampToEdgeWrapping;
+    tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 1;
+    return tex;
+  }
+
+  const baseFlameTex = makeFlameTexture(128);
+
+  // Flame geometry: a stretched plane with its base at the origin (extends along +X).
+  const FLAME_L = 0.95;
+  const FLAME_W = 0.55;
+  const flameGeo = new THREE.PlaneGeometry(FLAME_L, FLAME_W);
+  flameGeo.translate(FLAME_L * 0.5, 0, 0);
 
   function makeThruster(dirX, dirY) {
     const g = new THREE.Group();
     g.userData.dir = { x: dirX, y: dirY };
-    // Place nozzle on that side.
-    const off = 1.22;
-    g.position.set(dirX * off, dirY * off, 0.68);
 
-    const nozzle = new THREE.Mesh(nozzleGeo, thrusterNozzleMat);
-    nozzle.renderOrder = 64;
-    // Small offset so the nozzle reads as an attached side-jet.
-    nozzle.position.set(dirX * 0.10, dirY * 0.10, 0.08);
-    g.add(nozzle);
+    // Place the flame at the capsule's thrusters (artwork).
+    // Tuned for Capsule_CyberYolks.png plane sizing.
+    const offX = 1.28;
+    const offY = 1.06;
+    g.position.set(dirX * offX, dirY * offY, 0.86);
 
-    const flame = new THREE.Mesh(flameGeo, flameMat.clone());
-    flame.renderOrder = 65;
-    flame.visible = false;
-    // Default cone points +Y, rotate to match dir.
     const ang = Math.atan2(dirY, dirX);
-    flame.rotation.z = ang - Math.PI / 2;
-    // Place flame base exactly at the nozzle opening.
-    const nozzleTip = new THREE.Vector3(dirX * 0.16, dirY * 0.16, 0.08);
-    flame.position.copy(nozzleTip);
-    g.userData.nozzleTip = nozzleTip;
-    flame.scale.setScalar(0.62);
-    g.add(flame);
-    g.userData.flame = flame;
+    const seed = rand2(dirX * 91.7 + dirY * 33.3, 8.8) * Math.PI * 2;
+    g.userData.seed = seed;
+    // Smoothed intensity so flames feel like continuous thrust, not flicker pulses.
+    g.userData.inten = 0;
+
+    // Core flame
+    const coreTex = baseFlameTex.clone();
+    coreTex.needsUpdate = true;
+    const coreMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(0x66ccff),
+      map: coreTex,
+      transparent: true,
+      opacity: 0.0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      depthTest: false,
+    });
+    const core = new THREE.Mesh(flameGeo, coreMat);
+    core.renderOrder = 65;
+    core.visible = false;
+    core.rotation.z = ang;
+    core.position.set(dirX * 0.08, dirY * 0.08, 0.0);
+    g.add(core);
+
+    // Soft bloom
+    const bloomTex = baseFlameTex.clone();
+    bloomTex.needsUpdate = true;
+    const bloomMat = coreMat.clone();
+    bloomMat.map = bloomTex;
+    bloomMat.opacity = 0.0;
+    const bloom = new THREE.Mesh(flameGeo, bloomMat);
+    bloom.renderOrder = 65;
+    bloom.visible = false;
+    bloom.rotation.z = ang;
+    bloom.position.set(dirX * 0.08, dirY * 0.08, -0.02);
+    bloom.scale.setScalar(1.25);
+    g.add(bloom);
+
+    g.userData.core = core;
+    g.userData.bloom = bloom;
     thrusterGroup.add(g);
     return g;
   }
 
-  const thrusters = [
-    makeThruster(-1, 0),
-    makeThruster(1, 0),
-    makeThruster(0, -1),
-    makeThruster(0, 1),
-  ];
+  // Thruster hardware is in the artwork; we render fire for 4 directions.
+  const thrusters = [makeThruster(-1, 0), makeThruster(1, 0), makeThruster(0, -1), makeThruster(0, 1)];
 
   // Plasma cannon (points toward aimAngle)
   const playerAimGroup = new THREE.Group();
@@ -1333,7 +1488,9 @@ export function createRenderer3D(glCanvas) {
   cannonBarrelGeo.rotateZ(-Math.PI / 2);
   const cannon = new THREE.Group();
   cannon.renderOrder = 66;
-  cannon.position.set(0.90, 0, 0.84);
+  // Place the cannon more on top of the capsule so it reads like a turret.
+  // Slightly forward so the muzzle sits outside the capsule silhouette.
+  cannon.position.set(0.55, 0, 1.02);
   playerAimGroup.add(cannon);
 
   const cannonBase = new THREE.Mesh(cannonBaseGeo, cannonCrystalMat);
@@ -1505,13 +1662,28 @@ export function createRenderer3D(glCanvas) {
     const pY = toVY(player.y);
     const bob = 0.35 * Math.sin(tNow / 170);
     playerGroup.position.set(pX, pY, 24 + bob);
+    // Keep the rig scale stable so cannon/thrusters/VFX stay consistent.
+    // If you want the capsule image bigger, scale only the sprite mesh (see loader section).
     playerGroup.scale.setScalar(player.radius * 1.25);
 
-    // Crystal capsule: tint via attenuation + inner glow.
+    // Capsule: tint the glass + drive neon seams.
     capsuleCrystalMat.attenuationColor.copy(pCol);
     capsuleInnerGlowMat.color.copy(pCol);
     capsuleBandMat.color.copy(pCol);
     capsuleBandMat.emissive.copy(pCol);
+
+    const hullMat = capsuleGroup.userData?.hullMat;
+    const canopyRimMat = capsuleGroup.userData?.canopyRimMat;
+    if (hullMat) {
+      hullMat.emissive.copy(pCol);
+      // Base seam glow tracks energy; never fully off.
+      hullMat.emissiveIntensity = 0.14 + 0.38 * er;
+    }
+    if (canopyRimMat) {
+      canopyRimMat.color.copy(pCol).lerp(new THREE.Color(0xffffff), 0.35);
+      canopyRimMat.emissive.copy(pCol);
+      canopyRimMat.emissiveIntensity = 0.35 + 0.65 * er;
+    }
 
     // Energy-driven capsule feedback.
     const baseInner = 0.16 + 0.18 * er;
@@ -1520,6 +1692,12 @@ export function createRenderer3D(glCanvas) {
 
     capsuleInnerGlowMat.opacity = baseInner + (lowEnergy30 ? (0.08 + 0.16 * warnPulse) : 0);
     capsuleBandMat.emissiveIntensity = 0.75 + 0.75 * er + (lowEnergy30 ? 0.55 * warnFlick : 0);
+
+    if (hullMat && lowEnergy30) {
+      // When low energy, shift seams slightly toward warning hue.
+      hullMat.emissive.copy(pCol).lerp(new THREE.Color(0xff4d6d), 0.35);
+      hullMat.emissiveIntensity += 0.18 * warnPulse + 0.12 * warnFlick;
+    }
 
     // Low-energy ring around capsule (under 30%).
     capsuleLowEnergyRing.visible = lowEnergy30;
@@ -1560,6 +1738,9 @@ export function createRenderer3D(glCanvas) {
 
       // Give the band a quick kick too.
       capsuleBandMat.emissiveIntensity += 1.55 * amp;
+
+      if (hullMat) hullMat.emissiveIntensity += 0.95 * amp;
+      if (canopyRimMat) canopyRimMat.emissiveIntensity += 0.85 * amp;
     } else {
       capsuleChargePulse.visible = false;
       capsuleChargePulseMat.opacity = 0.0;
@@ -1593,18 +1774,66 @@ export function createRenderer3D(glCanvas) {
     const thrust = clamp(sp / 240, 0, 1);
     for (const t of thrusters) {
       const d = t.userData.dir;
-      const flame = t.userData.flame;
+      const core = t.userData.core;
+      const bloom = t.userData.bloom;
+      const seed = t.userData.seed || 0;
+      const prev = typeof t.userData.inten === 'number' ? t.userData.inten : 0;
+
+      // Fire opposite the movement direction.
+      // ex/ey is the exhaust direction in view-space.
       const dot = ex * d.x + ey * d.y;
-      const inten = clamp(dot, 0, 1) * thrust;
-      flame.visible = inten > 0.006;
-      if (!flame.visible) {
-        flame.material.opacity = 0.0;
+      let target = clamp(dot, 0, 1) * thrust;
+
+      // Deadzone to make it "perfect": prevents unrelated thrusters from faintly firing.
+      if (target < 0.12) target = 0;
+      // Shape the curve so it snaps on/off more decisively.
+      target = target > 0 ? Math.pow(target, 1.20) : 0;
+
+      // Smooth intensity so thrust looks like continuous output while moving.
+      // Faster rise, slightly slower fall for pleasing "engine" feel.
+      const rise = 0.22;
+      const fall = 0.14;
+      const k = target > prev ? rise : fall;
+      const inten = prev + (target - prev) * k;
+      t.userData.inten = inten;
+
+      const visible = inten > 0.008;
+      core.visible = visible;
+      bloom.visible = visible;
+      if (!visible) {
+        core.material.opacity = 0.0;
+        bloom.material.opacity = 0.0;
         continue;
       }
-      // Thruster flame color leans warm-white + player tint.
-      flame.material.color.copy(pCol).lerp(new THREE.Color(0xffffff), 0.55);
-      flame.material.opacity = 0.08 + inten * 0.42;
-      flame.scale.setScalar(0.55 + inten * 0.75);
+
+      // Keep flicker subtle (avoid "shooting" pulses). The thrust intensity drives the look.
+      const flick = 0.96 + 0.04 * Math.sin(tNow / 140 + seed);
+      const shimmer = 0.95 + 0.05 * Math.sin(tNow / 90 + seed * 1.7);
+
+      // Color: icy blue core with a slight white-hot mix.
+      core.material.color.copy(pCol).lerp(new THREE.Color(0x66ccff), 0.65).lerp(new THREE.Color(0xffffff), 0.25);
+      bloom.material.color.copy(core.material.color);
+
+      // Exaggerate brightness a bit for punch.
+      core.material.opacity = (0.14 + inten * 0.72) * flick;
+      bloom.material.opacity = (0.10 + inten * 0.40) * shimmer;
+
+      // Length/width scaling (geometry extends along +X; rotation already aligns it).
+      // Exaggerate length/width for a more fun, readable thrust.
+      const len = 0.85 + inten * 1.85;
+      const wid = 0.62 + inten * 0.55;
+      core.scale.set(len, wid, 1);
+      bloom.scale.set(len * 1.35, wid * 1.35, 1);
+
+      // Tiny texture drift for extra life (each thruster has its own cloned texture).
+      if (core.material.map) {
+        core.material.map.offset.x = ((tNow / 900) + seed) % 1;
+        core.material.map.needsUpdate = true;
+      }
+      if (bloom.material.map) {
+        bloom.material.map.offset.x = ((tNow / 1050) + seed * 1.13) % 1;
+        bloom.material.map.needsUpdate = true;
+      }
     }
 
     // Aim pointer
@@ -1857,29 +2086,33 @@ export function createRenderer3D(glCanvas) {
       }
 
       const g = enemyGlowMeshes[i];
-      g.visible = true;
-      g.position.set(ex, ey, 20);
-      // Thin outline (tiny) so even black enemies read on black.
-      const pulse01 = 0.5 + 0.5 * Math.sin(tNow / 200 + (e.blobSeed || 0) * 0.7);
-      const glowScale = isTargetEnemy ? (1.10 + 0.02 * pulse01) : 1.06;
-      g.scale.set(sx * glowScale, sy * glowScale, sz * glowScale);
+      // Only the target enemy gets a bright outline/glow.
+      // This prevents the WebGL layer from globally brightening all enemies.
+      g.visible = isTargetEnemy;
+      if (g.visible) {
+        g.position.set(ex, ey, 20);
+        const pulse01 = 0.5 + 0.5 * Math.sin(tNow / 200 + (e.blobSeed || 0) * 0.7);
+        const glowScale = 1.10 + 0.02 * pulse01;
+        g.scale.set(sx * glowScale, sy * glowScale, sz * glowScale);
 
-      // Keep this extremely simple for perf: just pulse outline opacity for target.
-      // No blending/depthTest switches (those can cause hitches on some GPUs).
-      g.material.color.set(isVeryDark ? 0xf0f0f0 : 0xe0e0e0);
-      g.material.opacity = (isVeryDark ? 0.22 : 0.14) + (isTargetEnemy ? (0.10 + 0.08 * pulse01) : 0);
-      if (g.material.userData && g.material.userData.shader) {
-        g.material.userData.shader.uniforms.uTime.value = tNow;
-        g.material.userData.shader.uniforms.uSeed.value = (e.blobSeed || 0) + i * 0.37;
+        g.material.color.set(isVeryDark ? 0xf0f0f0 : 0xe0e0e0);
+        g.material.opacity = (isVeryDark ? 0.22 : 0.14) + (0.10 + 0.08 * pulse01);
+        if (g.material.userData && g.material.userData.shader) {
+          g.material.userData.shader.uniforms.uTime.value = tNow;
+          g.material.userData.shader.uniforms.uSeed.value = (e.blobSeed || 0) + i * 0.37;
+        }
       }
 
       const c = enemyCoreMeshes[i];
-      c.visible = true;
-      c.position.set(ex, ey, 20);
-      const pulse = 0.88 + 0.12 * Math.sin(tNow / 140 + (e.blobSeed || 0));
-      c.scale.set(sx * 0.62 * pulse, sy * 0.62 * pulse, sz * 0.62 * pulse);
-      c.material.color.copy(tmpColor);
-      c.material.opacity = 0.40;
+      // Inner additive core glow is also target-only; otherwise it washes out colors.
+      c.visible = isTargetEnemy;
+      if (c.visible) {
+        c.position.set(ex, ey, 20);
+        const pulse = 0.88 + 0.12 * Math.sin(tNow / 140 + (e.blobSeed || 0));
+        c.scale.set(sx * 0.62 * pulse, sy * 0.62 * pulse, sz * 0.62 * pulse);
+        c.material.color.copy(tmpColor);
+        c.material.opacity = 0.40;
+      }
 
       // shadow
       tmpObj.position.set(ex, ey, 0.9);
@@ -1919,6 +2152,14 @@ export function createRenderer3D(glCanvas) {
         const offDot = offX * nxw + offY * nyw;
         offX = nxw * offDot;
         offY = nyw * offDot;
+
+        // If gameplay already spawns bullets at/near the muzzle, don't apply an extra
+        // render-only muzzle offset (it would double-shift the bolt).
+        const actualDot = (b.x - player.x) * nxw + (b.y - player.y) * nyw;
+        if (actualDot >= offDot * 0.65) {
+          offX = 0;
+          offY = 0;
+        }
 
         const offLen = Math.hypot(offX, offY);
 

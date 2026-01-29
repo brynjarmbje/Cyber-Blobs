@@ -131,13 +131,15 @@ export function drawJellyBlobEnemy(ctx, e, nowMs, isNext) {
   ctx.closePath();
   ctx.fill();
 
-  // Additive inner glow (helps read as "jelly" on dark backgrounds)
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = isNext ? 0.30 : 0.22;
-  ctx.fillStyle = colorToRGBA(e.color, 0.55);
-  ctx.fill();
-  ctx.restore();
+  // Additive inner glow (ONLY for the target yolk)
+  if (isNext) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = colorToRGBA(e.color, 0.55);
+    ctx.fill();
+    ctx.restore();
+  }
 
   // Gloss highlight (moves a bit)
   ctx.shadowBlur = 0;
@@ -148,12 +150,20 @@ export function drawJellyBlobEnemy(ctx, e, nowMs, isNext) {
   ctx.fill();
   ctx.globalAlpha = 1;
 
-  // Fresnel-ish rim light (adds depth)
+  // Rim light (bright border ONLY for the target yolk)
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  ctx.globalAlpha = isNext ? 0.70 : 0.42;
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = isNext ? 'rgba(255,255,255,0.70)' : 'rgba(220,250,255,0.32)';
+  if (isNext) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.70;
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.70)';
+  } else {
+    // Non-targets: keep it subtle so enemies don't all look "glowy".
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 0.12;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+  }
   ctx.stroke();
   ctx.restore();
 

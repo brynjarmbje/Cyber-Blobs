@@ -1,7 +1,7 @@
-import { getUiElements } from './ui.js';
-import { createGame } from './game.js';
-import { registerServiceWorker } from './pwa.js';
-import { initMusicSystem } from './audio.js';
+import { getUiElements } from '../ui/ui.js';
+import { createGame } from '../game/game.js';
+import { registerServiceWorker } from '../platform/pwa.js';
+import { initMusicSystem } from '../platform/audio.js';
 
 const ui = getUiElements();
 if (!ui.canvas) {

@@ -1,0 +1,117 @@
+<div id="app" class="app--cockpit">
+  <!-- Minimal top row: title + pause (mobile-first) -->
+  <header id="topBar" class="topBar--minimal">
+    <div class="brand">
+      <div class="brandLockup" aria-label="Cyber Yolks">
+        <div class="brandTitle">
+          <span class="t1">CYBER</span>
+          <span class="t2">YOLKS</span>
+        </div>
+        <div class="brandSub brandSub--header">Survive.</div>
+      </div>
+    </div>
+
+    <div class="actions"></div>
+  </header>
+
+  <main id="gameArea" aria-label="Game">
+    <div id="gameShell">
+      <canvas id="glCanvas" width="800" height="600" aria-hidden="true"></canvas>
+      <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+      <!-- In-canvas shooter HUD -->
+      <div id="igHud" class="igHud igHud--cockpit" aria-label="In-game HUD">
+        <button id="pauseBtn" class="igPauseBtn igPauseBtn--cockpit" type="button" aria-pressed="false" aria-label="Pause" title="Pause (P / ESC)">PAUSE</button>
+        <div class="igHudPanel igHudPanel--left" aria-hidden="true">
+          <div class="igStat igStat--level" style="--accent: #66ccff; --accentGlow: rgba(102, 204, 255, 0.18)">
+            <div class="igLabel">LVL</div>
+            <div class="igValue" id="hudLevel">1</div>
+          </div>
+          <div class="igStat igStat--cash" style="--accent: #ffd54a; --accentGlow: rgba(255, 213, 74, 0.16)">
+            <div class="igLabel">CASH</div>
+            <div class="igValue" id="colorCash">0</div>
+          </div>
+        </div>
+
+        <div class="igHudPanel igHudPanel--center" aria-hidden="true">
+          <div id="igTarget" class="igTarget igTarget--cockpit" style="--accent: #66ccff">
+            <div class="igTargetOrb" aria-hidden="true">
+              <div class="igTargetRing" aria-hidden="true">
+                <canvas class="igSwatch" id="igTargetSwatch" width="44" height="44" aria-label="Exposed target enemy"></canvas>
+              </div>
+            </div>
+            <div class="igTargetText igTargetText--cockpit" aria-hidden="true">
+              <!-- Kept for JS pulse timing; hidden visually in cockpit layout. -->
+              <div class="igWord" id="igTargetWord">EXPOSED</div>
+              <div class="igTargetName" id="nextColorName"></div>
+            </div>
+          </div>
+          <!-- Hidden legacy swatch (kept for mirroring/debug; safe to ignore visually) -->
+          <canvas class="colorSwatch igHudLegacySwatch" id="nextColorSwatch" width="22" height="22" aria-hidden="true"></canvas>
+        </div>
+
+        <div class="igHudPanel igHudPanel--right">
+          <div class="igHudRightStack" aria-hidden="true">
+            <div id="igEnergy" class="igEnergy" style="--p: 1; --accent: #66ccff">
+              <div class="igLabel igEnergyLabel" aria-hidden="true">ENERGY</div>
+              <div class="igEnergyBar" aria-hidden="true">
+                <div class="igEnergyFill"></div>
+                <div class="igEnergyCore"></div>
+                <div class="igEnergyPct" id="igEnergyPct">100%</div>
+              </div>
+            </div>
+
+            <div id="livesOverlay" class="igLives" aria-label="Lives" style="--accent: #ff4d6d; --accentGlow: rgba(255, 77, 109, 0.16)">
+              <span class="igLabel" aria-hidden="true">LIVES</span>
+              <span id="livesContainer"></span>
+            </div>
+          </div>
+
+          <div id="topRightHud" class="igHudRightMeta" aria-hidden="true">
+            <div id="activeOverlay" aria-live="polite"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="pauseOverlay" aria-hidden="true">PAUSED</div>
+      <div id="startCountdown" class="startCountdown hidden" aria-hidden="true"></div>
+
+      <div id="ultButtons" aria-label="Ultimates">
+        <button id="laserTopBtn" class="hidden" type="button" aria-label="Activate laser">LASER</button>
+        <button id="nukeTopBtn" type="button" aria-label="Activate nuke">NUKE</button>
+      </div>
+
+      <div id="centerToast" aria-hidden="true"></div>
+      <div id="riftToast" aria-hidden="true"></div>
+
+      <div id="levelUpMessage">LEVEL UP!</div>
+      <div id="flashOverlay"></div>
+
+      <div id="desktopControlsHint">
+        <span class="hintGroup">Move <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Aim <button id="aimModeBtn" class="hintToggle" type="button" aria-pressed="false" title="Toggle mouse aim">Z/X</button></span>
+        <span class="hintDot">•</span>
+        <span id="desktopUltStatus" class="hintGroup hintGroup--ultStatus" aria-hidden="true"></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Pause <kbd>P</kbd>/<kbd>ESC</kbd></span>
+        <span class="hintDot">•</span>
+        <span class="hintGroup">Connect <kbd>E</kbd></span>
+      </div>
+    </div>
+
+    <!-- Touch Controls (Tablet/Phone) -->
+    <div id="touchControls" aria-label="Touch controls">
+      <div class="joystick" id="moveStick" aria-label="Move joystick">
+        <div class="knob" id="moveKnob"></div>
+      </div>
+      <div id="touchUltStack" aria-label="Ultimates">
+        <button id="ultBtn" class="ultBtn hidden" type="button" aria-label="Activate laser">LASER</button>
+        <button id="nukeBtn" class="ultBtn ultBtn--nuke" type="button" aria-label="Activate nuke">NUKE</button>
+      </div>
+      <div class="joystick" id="aimStick" aria-label="Aim joystick">
+        <div class="knob" id="aimKnob"></div>
+      </div>
+    </div>
+  </main>
+</div>

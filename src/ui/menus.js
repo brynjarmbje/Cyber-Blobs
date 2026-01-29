@@ -92,6 +92,23 @@ export function installMenuBindings(
     onSettingsAimToggle,
   } = {}
 ) {
+  const mainMenuIsYolk = () => !!document.querySelector('#mainMenu.mainMenu--yolk');
+
+  function setMainMenuLabelDataAttrs() {
+    const menu = document.getElementById('mainMenu');
+    if (!menu) return;
+
+    // Ensure the label span has a stable copy for CSS pseudo-elements.
+    const btns = [ui?.mainPlayBtn, ui?.mainShopBtn, ui?.mainBoardBtn, ui?.mainSettingsBtn, ui?.mainAboutBtn].filter(Boolean);
+    for (const btn of btns) {
+      const labelEl = btn.querySelector?.('.mmText');
+      if (!labelEl) continue;
+      const txt = String(labelEl.textContent || '').trim();
+      if (!txt) continue;
+      if (labelEl.getAttribute('data-label') !== txt) labelEl.setAttribute('data-label', txt);
+    }
+  }
+
   function isAudioEnabled() {
     // Reuse the music toggle as the global audio toggle.
     const btn = ui?.musicBtn;
@@ -484,24 +501,42 @@ export function installMenuBindings(
   // Main menu buttons
   installMenuBtnFX(ui.mainPlayBtn, {
     wobbleChance: 0.35,
-    hitTest: (e) => playAlphaHit.hitTest(ui.mainPlayBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+    hitTest: (e) =>
+      mainMenuIsYolk()
+        ? playAlphaHit.hitTest(ui.mainPlayBtn, e.clientX, e.clientY, { alphaThreshold: 14 })
+        : true,
   });
   installMenuBtnFX(ui.mainShopBtn, {
     wobbleChance: 0.20,
-    hitTest: (e) => shopAlphaHit.hitTest(ui.mainShopBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+    hitTest: (e) =>
+      mainMenuIsYolk()
+        ? shopAlphaHit.hitTest(ui.mainShopBtn, e.clientX, e.clientY, { alphaThreshold: 14 })
+        : true,
   });
   installMenuBtnFX(ui.mainBoardBtn, {
     wobbleChance: 0.22,
-    hitTest: (e) => boardAlphaHit.hitTest(ui.mainBoardBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+    hitTest: (e) =>
+      mainMenuIsYolk()
+        ? boardAlphaHit.hitTest(ui.mainBoardBtn, e.clientX, e.clientY, { alphaThreshold: 14 })
+        : true,
   });
   installMenuBtnFX(ui.mainSettingsBtn, {
     wobbleChance: 0.18,
-    hitTest: (e) => settingsAlphaHit.hitTest(ui.mainSettingsBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+    hitTest: (e) =>
+      mainMenuIsYolk()
+        ? settingsAlphaHit.hitTest(ui.mainSettingsBtn, e.clientX, e.clientY, { alphaThreshold: 14 })
+        : true,
   });
   installMenuBtnFX(ui.mainAboutBtn, {
     wobbleChance: 0.18,
-    hitTest: (e) => aboutAlphaHit.hitTest(ui.mainAboutBtn, e.clientX, e.clientY, { alphaThreshold: 14 }),
+    hitTest: (e) =>
+      mainMenuIsYolk()
+        ? aboutAlphaHit.hitTest(ui.mainAboutBtn, e.clientX, e.clientY, { alphaThreshold: 14 })
+        : true,
   });
+
+  // Layered label rendering relies on data-label for pseudo-elements.
+  setMainMenuLabelDataAttrs();
 
   // Modal close buttons use the standard mini button styling (no yolk art / no alpha hit-testing).
 

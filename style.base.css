@@ -1,0 +1,903 @@
+/* 
+  style.css: 
+  A fun, neon-like theme for your .io survival game
+*/
+
+/* Remove default margins/padding, use full viewport */
+html, body {
+    margin: 0;
+    padding: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+  overflow: hidden;
+    background: #05070c; /* solid dark base (no distracting animation) */
+    position: relative;
+  }
+
+  /* ---------- Main Menu (mobile-first) ---------- */
+  .mainMenu {
+    position: fixed;
+    inset: 0;
+    z-index: 120;
+    display: grid;
+    place-items: center;
+    padding: 22px 18px;
+    isolation: isolate;
+    background:
+      radial-gradient(1200px 820px at 50% 18%, rgba(120, 60, 255, 0.12), rgba(0,0,0,0) 62%),
+      radial-gradient(980px 680px at 25% 62%, rgba(70, 35, 120, 0.10), rgba(0,0,0,0) 66%),
+      radial-gradient(980px 720px at 80% 60%, rgba(55, 25, 95, 0.10), rgba(0,0,0,0) 68%),
+      #05070c;
+  }
+
+  .mainMenuHero {
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: clamp(260px, 52vh, 560px);
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.96;
+    background:
+      radial-gradient(900px 520px at 50% 18%, rgba(0,0,0,0.18), rgba(0,0,0,0) 62%),
+      radial-gradient(900px 620px at 50% 55%, rgba(0,0,0,0.30), rgba(0,0,0,0) 70%),
+      linear-gradient(to bottom,
+        rgba(5, 7, 12, 0.52) 0%,
+        rgba(5, 7, 12, 0.18) 20%,
+        rgba(5, 7, 12, 0.44) 64%,
+        rgba(5, 7, 12, 0.94) 100%
+      ),
+      url('./assets/menu-hero.png');
+    background-size: auto, auto, auto, cover;
+    background-position: center, center, center, 50% 45%;
+    background-repeat: no-repeat;
+    filter: saturate(1.06) contrast(1.04) brightness(0.92);
+    mix-blend-mode: normal;
+    -webkit-mask-image: linear-gradient(to bottom,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,1) 10%,
+      rgba(0,0,0,1) 78%,
+      rgba(0,0,0,0) 100%
+    );
+    mask-image: linear-gradient(to bottom,
+      rgba(0,0,0,0) 0%,
+      rgba(0,0,0,1) 10%,
+      rgba(0,0,0,1) 78%,
+      rgba(0,0,0,0) 100%
+    );
+  }
+
+  .mainMenuStars {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0.85;
+    background:
+      /* distant stars (repeat patterns) */
+      radial-gradient(rgba(255,255,255,0.10) 0.75px, transparent 1.15px),
+      radial-gradient(rgba(255,255,255,0.07) 0.65px, transparent 1.15px),
+      radial-gradient(rgba(255,255,255,0.05) 0.55px, transparent 1.15px),
+      /* a few brighter anchors */
+      radial-gradient(circle at 10% 20%, rgba(255,255,255,0.55) 0 1px, transparent 2px),
+      radial-gradient(circle at 70% 15%, rgba(255,255,255,0.45) 0 1px, transparent 2px),
+      radial-gradient(circle at 85% 35%, rgba(255,255,255,0.35) 0 1px, transparent 2px),
+      radial-gradient(circle at 25% 60%, rgba(255,255,255,0.35) 0 1px, transparent 2px),
+      radial-gradient(circle at 60% 78%, rgba(255,255,255,0.40) 0 1px, transparent 2px),
+      radial-gradient(circle at 12% 88%, rgba(255,255,255,0.30) 0 1px, transparent 2px);
+    background-repeat: repeat, repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+    background-size: 240px 240px, 360px 360px, 520px 520px, auto, auto, auto, auto, auto, auto;
+    background-position: 0 0, 120px 80px, 260px 200px, center, center, center, center, center, center;
+    filter: drop-shadow(0 0 10px rgba(255,255,255,0.08));
+    pointer-events: none;
+  }
+
+  .mainMenuFooterArt {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: clamp(220px, 38vh, 460px);
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.95;
+    background:
+      /* only darken near the TOP so the bottom stays fully visible */
+      radial-gradient(900px 260px at 50% 6%, rgba(5, 7, 12, 0.40), rgba(0,0,0,0) 72%),
+      url('./assets/asteroid-crystal-reactor.png');
+    background-size: auto, cover;
+    /* Lock the asteroid to the bottom edge so it never looks "cut" at the bottom */
+    background-position: center, 50% 100%;
+    background-repeat: no-repeat;
+    filter: saturate(1.06) contrast(1.04) brightness(0.92);
+    -webkit-mask-image: linear-gradient(to top,
+      rgba(0,0,0,1) 0%,
+      rgba(0,0,0,1) 62%,
+      rgba(0,0,0,0.75) 78%,
+      rgba(0,0,0,0.00) 100%
+    );
+    mask-image: linear-gradient(to top,
+      rgba(0,0,0,1) 0%,
+      rgba(0,0,0,1) 62%,
+      rgba(0,0,0,0.75) 78%,
+      rgba(0,0,0,0.00) 100%
+    );
+  }
+
+  .mainMenuCard {
+    position: relative;
+    z-index: 3;
+    width: min(440px, 100%);
+    display: grid;
+    gap: 14px;
+    align-content: center;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .mainMenuTitle {
+    margin: 4px 0 0;
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    text-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  }
+  .mainMenuTitle .t1,
+  .mainMenuTitle .t2 {
+    display: block;
+    font-size: clamp(48px, 10vw, 64px);
+  }
+  .mainMenuTitle .t1 {
+    background: linear-gradient(90deg, #2dfcff, #2e6bff, #7b2cff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 10px 24px rgba(0, 220, 255, 0.10));
+    animation: neonTitlePulseBlue 2600ms ease-in-out infinite;
+    will-change: filter;
+  }
+  .mainMenuTitle .t2 {
+    margin-top: 6px;
+    background: linear-gradient(90deg, #a463ff, #ff4db8, #ff4d4d);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 10px 24px rgba(255, 80, 200, 0.10));
+    animation: neonTitlePulsePurple 2800ms ease-in-out infinite;
+    will-change: filter;
+  }
+
+  @keyframes neonTitlePulseBlue {
+    0%, 100% {
+      filter:
+        drop-shadow(0 0 8px rgba(45, 252, 255, 0.18))
+        drop-shadow(0 0 18px rgba(46, 107, 255, 0.14))
+        drop-shadow(0 12px 26px rgba(0, 220, 255, 0.10));
+    }
+    50% {
+      filter:
+        drop-shadow(0 0 12px rgba(45, 252, 255, 0.30))
+        drop-shadow(0 0 28px rgba(46, 107, 255, 0.22))
+        drop-shadow(0 16px 34px rgba(0, 220, 255, 0.14));
+    }
+  }
+
+  @keyframes neonTitlePulsePurple {
+    0%, 100% {
+      filter:
+        drop-shadow(0 0 8px rgba(164, 99, 255, 0.16))
+        drop-shadow(0 0 18px rgba(255, 77, 184, 0.12))
+        drop-shadow(0 12px 26px rgba(255, 80, 200, 0.10));
+    }
+    50% {
+      filter:
+        drop-shadow(0 0 12px rgba(164, 99, 255, 0.28))
+        drop-shadow(0 0 28px rgba(255, 77, 184, 0.20))
+        drop-shadow(0 16px 34px rgba(255, 80, 200, 0.14));
+    }
+  }
+
+  .mainMenuTag {
+    margin-top: -6px;
+    font-size: 14px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(210, 240, 255, 0.85);
+  }
+
+  .mainMenuActions {
+    width: 100%;
+    display: grid;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuActions {
+    gap: 16px;
+    margin-top: 12px;
+    justify-items: center;
+  }
+
+  /* Main menu buttons: "yolk" core + translucent jelly blob */
+  .mainMenu .mainMenuActions {
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  /* Main menu buttons: image-based glossy yolk art (sprite sheet with transparency). */
+  .mainMenu .mainMenuBtn {
+    width: 100%;
+    height: 64px;
+    padding: 0;
+    gap: 0;
+    justify-content: center;
+
+    position: relative;
+    overflow: visible;
+
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+
+    cursor: pointer;
+
+    /* Avoid iOS/Chrome tap highlight box */
+    -webkit-tap-highlight-color: rgba(0,0,0,0);
+    appearance: none;
+    -webkit-appearance: none;
+
+    /* Per-button image. */
+    --btnImg: none;
+
+    /* Art box size (used by ::before and alpha hit-testing). */
+    --artW: min(480px, 94%);
+    --artH: 84px;
+
+    /* Motion tuning */
+    --pressScale: 0.965;
+    --pressRot: -0.6deg;
+    --pressSkew: -1.2deg;
+
+    filter: none;
+    transform: translateY(0px) scale(1);
+    transition: transform 110ms cubic-bezier(0.18, 0.0, 0.18, 1.0), filter 140ms ease;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    width: var(--artW);
+    height: var(--artH);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 1;
+
+    /* Override generic .mainMenuBtn::before overlay styles used elsewhere. */
+    opacity: 1;
+    mix-blend-mode: normal;
+
+    background-image: var(--btnImg);
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+
+    /* A little depth without wobble */
+    filter: drop-shadow(0 10px 22px rgba(0,0,0,0.18));
+  }
+
+  /* Idle “3D” effect: tiny depth pulse + specular sweep clipped to the yolk alpha. */
+  .mainMenu.mainMenu--yolk .mainMenuBtn:not(:hover):not(:active):not(.isPressed)::before {
+    animation: yolkDepthPulse 3600ms ease-in-out infinite;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    width: var(--artW);
+    height: var(--artH);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 2;
+
+    background:
+      linear-gradient(
+        115deg,
+        rgba(255,255,255,0.00) 0%,
+        rgba(255,255,255,0.00) 42%,
+        rgba(255,255,255,0.14) 50%,
+        rgba(255,255,255,0.00) 58%,
+        rgba(255,255,255,0.00) 100%
+      );
+    background-size: 260% 260%;
+    background-position: -120% 50%;
+
+    /* Clip highlight to the button art (no rectangular overlay). */
+    -webkit-mask-image: var(--btnImg);
+    mask-image: var(--btnImg);
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-size: contain;
+    mask-size: contain;
+    -webkit-mask-position: center;
+    mask-position: center;
+
+    mix-blend-mode: screen;
+    opacity: 0;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn:not(:hover):not(:active):not(.isPressed)::after {
+    animation: yolkSpecularSweep 5200ms ease-in-out infinite;
+    will-change: background-position, opacity;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn:hover {
+    filter: brightness(1.03) saturate(1.04);
+    transform: translateY(-1px) scale(1.01);
+
+    /* Override legacy `.mainMenuBtn:hover` rectangle glow. */
+    box-shadow: none;
+  }
+
+  /* Shape-following hover glow (uses legacy per-button `--btnGlow` when present). */
+  .mainMenu.mainMenu--yolk .mainMenuBtn:hover::before {
+    filter:
+      drop-shadow(0 0 14px var(--btnGlow, rgba(255, 175, 40, 0.20)))
+      drop-shadow(0 0 6px rgba(255, 255, 255, 0.10));
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn:hover::after {
+    opacity: 0.55;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn:active,
+  .mainMenu.mainMenu--yolk .mainMenuBtn.isPressed {
+    transform: translateY(0px) scale(var(--pressScale)) skewX(var(--pressSkew)) rotate(var(--pressRot));
+    transition-duration: 70ms;
+    transition-timing-function: cubic-bezier(0.12, 0.0, 0.15, 1.0);
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn.isBouncing {
+    animation: yolkBtnBounce 260ms cubic-bezier(0.2, 0.0, 0.2, 1.0) both;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn.isWobble {
+    animation: yolkBtnWobble 320ms ease-in-out both;
+  }
+
+  @keyframes yolkBtnBounce {
+    0% { transform: translateY(0px) scale(var(--pressScale)) skewX(var(--pressSkew)) rotate(var(--pressRot)); }
+    55% { transform: translateY(-1px) scale(1.02); }
+    78% { transform: translateY(0px) scale(0.992); }
+    100% { transform: translateY(0px) scale(1); }
+  }
+
+  @keyframes yolkBtnWobble {
+    0% { transform: translateY(0px) scale(var(--pressScale)) skewX(var(--pressSkew)) rotate(var(--pressRot)); }
+    55% { transform: translateY(-1px) scale(1.01) skewX(0.6deg) rotate(0.6deg); }
+    100% { transform: translateY(0px) scale(1); }
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn:focus-visible {
+    outline: 2px solid rgba(255, 230, 120, 0.60);
+    outline-offset: 3px;
+  }
+
+  /* Prevent default focus outline (square) on mouse/touch; keep :focus-visible for keyboard. */
+  .mainMenu.mainMenu--yolk .mainMenuBtn:focus {
+    outline: none;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn .mmText {
+    /* Default: show text. Individual buttons can hide it when the art contains the label. */
+    position: relative;
+    z-index: 2;
+    color: rgba(255,255,255,0.98);
+    font-weight: 950;
+    font-size: 18px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-shadow:
+      0 2px 0 rgba(0,0,0,0.22),
+      0 10px 26px rgba(0,0,0,0.38);
+  }
+
+  /* Per-button sprite selection */
+  .mainMenu.mainMenu--yolk .mainMenuBtn--play {
+    /* Test: use the dedicated PLAY image asset */
+    --btnImg: url('./assets/play_cyberyolk_button.png');
+    --pressRot: -0.8deg;
+
+    --artW: min(520px, 94%);
+    --artH: 92px;
+  }
+
+  .mainMenu.mainMenu--yolk .mainMenuBtn--play .mmText {
+    opacity: 0;
+    color: transparent;
+    text-shadow: none;
+    user-select: none;
+  }
+  .mainMenu.mainMenu--yolk .mainMenuBtn--shop {
+    --btnImg: url('./assets/shop_button_cyberyolk.png');
+    --pressRot: 0.6deg;
+
+    /* Slightly smaller than the default buttons */
+    --artW: min(440px, 92%);
+    --artH: 76px;
+  }
+  .mainMenu.mainMenu--yolk .mainMenuBtn--board {
+    --btnImg: url('./assets/leaderboard_button_cyberyolk.png');
+    --pressRot: -0.6deg;
+  }
+  .mainMenu.mainMenu--yolk .mainMenuBtn--settings {
+    --btnImg: url('./assets/settings_button_cyberyolk.png');
+    --pressRot: 0.4deg;
+  }
+  .mainMenu.mainMenu--yolk .mainMenuBtn--about {
+    --btnImg: url('./assets/about_button_cyberyolk.png');
+    --pressRot: -0.5deg;
+
+    /* Slightly smaller than the default buttons */
+    --artW: min(440px, 92%);
+    --artH: 72px;
+  }
+
+  /* If the art already includes the label, hide the HTML text to avoid double-rendering. */
+  .mainMenu.mainMenu--yolk .mainMenuBtn--shop .mmText,
+  .mainMenu.mainMenu--yolk .mainMenuBtn--board .mmText,
+  .mainMenu.mainMenu--yolk .mainMenuBtn--settings .mmText,
+  .mainMenu.mainMenu--yolk .mainMenuBtn--about .mmText {
+    opacity: 0;
+    color: transparent;
+    text-shadow: none;
+    user-select: none;
+  }
+
+  /* Optional: add a little extra glow on PLAY (runs alongside the idle 3D effect). */
+  .mainMenu.mainMenu--yolk .mainMenuBtn--play:not(:hover):not(:active):not(.isPressed)::before {
+    animation:
+      yolkDepthPulse 3600ms ease-in-out infinite,
+      yolkPlayIdleGlow 1600ms ease-in-out infinite;
+  }
+
+  /* Mobile: slightly smaller buttons for tighter vertical space. */
+  @media (max-width: 420px) {
+    /* Keep the title large on mobile; only shrink buttons. */
+    .mainMenuTitle .t1,
+    .mainMenuTitle .t2 {
+      font-size: clamp(56px, 11vw, 64px);
+    }
+
+    .mainMenu.mainMenu--yolk .mainMenuActions {
+      gap: 9px;
+      margin-top: 10px;
+    }
+
+    .mainMenu.mainMenu--yolk .mainMenuBtn {
+      height: 58px;
+      --artW: min(440px, 92%);
+      --artH: 76px;
+    }
+
+    .mainMenu.mainMenu--yolk .mainMenuBtn--play {
+      --artW: min(480px, 92%);
+      --artH: 84px;
+    }
+
+    .mainMenu.mainMenu--yolk .mainMenuBtn--shop {
+      --artW: min(405px, 90%);
+      --artH: 68px;
+    }
+
+    .mainMenu.mainMenu--yolk .mainMenuBtn--about {
+      --artW: min(405px, 90%);
+      --artH: 64px;
+    }
+  }
+
+  @keyframes yolkPlayIdleGlow {
+    0%, 100% {
+      filter: drop-shadow(0 0 10px rgba(255, 175, 40, 0.12));
+    }
+    50% {
+      filter: drop-shadow(0 0 16px rgba(255, 175, 40, 0.22));
+    }
+  }
+
+  @keyframes yolkDepthPulse {
+    0%, 100% {
+      filter: drop-shadow(0 10px 22px rgba(0,0,0,0.18));
+    }
+    50% {
+      filter: drop-shadow(0 12px 26px rgba(0,0,0,0.15));
+    }
+  }
+
+  @keyframes yolkSpecularSweep {
+    0% {
+      opacity: 0;
+      background-position: -120% 50%;
+    }
+    12% {
+      opacity: 0.45;
+    }
+    52% {
+      opacity: 0.55;
+      background-position: 120% 50%;
+    }
+    78% {
+      opacity: 0.10;
+    }
+    100% {
+      opacity: 0;
+      background-position: 240% 50%;
+    }
+  }
+
+  /* ---------- Main Menu Buttons: Classic gradient style (default) ---------- */
+  /*
+    The existing sprite-based "yolk" buttons are kept as a backlog.
+    Add `mainMenu--yolk` to #mainMenu to use them.
+    Add `mainMenu--classic` (default) for the simpler colorful buttons.
+  */
+
+  .mainMenu.mainMenu--classic .mainMenuBtn {
+    width: min(320px, 100%);
+    height: 60px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+
+    /* Keep blend effects confined to each button (for mix-blend-mode text). */
+    isolation: isolate;
+
+    position: relative;
+    overflow: hidden;
+
+    border: 2px solid rgba(255,255,255,0.18);
+    border-radius: 15px;
+    background:
+      linear-gradient(90deg, var(--c1, #2dfcff), var(--c2, #2e6bff), var(--c3, #7b2cff));
+    box-shadow:
+      0 18px 46px rgba(0,0,0,0.42),
+      0 10px 22px rgba(0,0,0,0.22),
+      inset 0 1px 0 rgba(255,255,255,0.18);
+
+    cursor: pointer;
+    transform: translateY(0) scale(1);
+    transition: transform 120ms ease, filter 140ms ease, box-shadow 140ms ease;
+  }
+
+  /* Liquid-glass variant (macOS/iOS-style glossy translucency) */
+  .mainMenu.mainMenu--glass .mainMenuBtn {
+    /* Keep colors fully saturated; glass comes from highlights, not grey tint. */
+    background:
+      /* subtle dimmer layer so it's a touch less bright */
+      linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(0,0,0,0.12)),
+      linear-gradient(90deg, var(--c1, #2dfcff), var(--c2, #2e6bff), var(--c3, #7b2cff));
+    backdrop-filter: blur(10px) saturate(1.20);
+    -webkit-backdrop-filter: blur(10px) saturate(1.20);
+
+    border: 1px solid rgba(255,255,255,0.26);
+    box-shadow:
+      0 16px 44px rgba(0,0,0,0.42),
+      0 10px 22px rgba(0,0,0,0.22),
+      inset 0 1px 0 rgba(255,255,255,0.26);
+
+    /* Extra pop without changing palette */
+    filter: brightness(0.975) saturate(1.16) contrast(1.06);
+  }
+
+  .mainMenu.mainMenu--glass .mainMenuBtn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+
+    /* Specular highlight + top gloss band + moving sheen */
+    background:
+      radial-gradient(120% 120% at 20% 10%, rgba(255,255,255,0.72) 0%, rgba(255,255,255,0.26) 22%, rgba(255,255,255,0.00) 52%),
+      linear-gradient(to bottom, rgba(255,255,255,0.32), rgba(255,255,255,0.10) 40%, rgba(255,255,255,0.00) 70%),
+      linear-gradient(
+        115deg,
+        rgba(255,255,255,0.00) 0%,
+        rgba(255,255,255,0.00) 44%,
+        rgba(255,255,255,0.30) 50%,
+        rgba(255,255,255,0.00) 56%,
+        rgba(255,255,255,0.00) 100%
+      );
+    background-size: auto, auto, 240% 240%;
+    background-position: center, center, -120% 50%;
+    opacity: 0.64;
+    mix-blend-mode: normal;
+    transition: opacity 140ms ease;
+  }
+
+  .mainMenu.mainMenu--glass .mainMenuBtn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+
+    /* Inner border + subtle prismatic edge */
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.20), rgba(255,255,255,0.02) 42%, rgba(255,255,255,0.14) 72%, rgba(255,255,255,0.02));
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.14),
+      inset 0 1px 0 rgba(255,255,255,0.16);
+    opacity: 0.90;
+  }
+
+  .mainMenu.mainMenu--glass .mainMenuBtn:hover::before {
+    opacity: 0.76;
+    animation: glassSheenSweep 650ms ease-out both;
+  }
+
+  .mainMenu.mainMenu--glass .mainMenuBtn:hover {
+    filter: brightness(0.99) saturate(1.24) contrast(1.08);
+    box-shadow:
+      0 20px 54px rgba(0,0,0,0.46),
+      0 12px 26px rgba(0,0,0,0.24),
+      inset 0 1px 0 rgba(255,255,255,0.30);
+  }
+
+  @keyframes glassSheenSweep {
+    0% {
+      background-position: center, center, -120% 50%;
+    }
+    100% {
+      background-position: center, center, 120% 50%;
+    }
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn:hover {
+    filter: brightness(1.04) saturate(1.06);
+    transform: translateY(-1px) scale(1.01);
+    box-shadow:
+      0 20px 52px rgba(0,0,0,0.46),
+      0 12px 26px rgba(0,0,0,0.24),
+      inset 0 1px 0 rgba(255,255,255,0.20);
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn:active,
+  .mainMenu.mainMenu--classic .mainMenuBtn.isPressed {
+    transform: translateY(0) scale(0.985);
+  }
+
+  /* No wobble/bounce animations in classic mode (keeps it crisp). */
+  .mainMenu.mainMenu--classic .mainMenuBtn.isBouncing,
+  .mainMenu.mainMenu--classic .mainMenuBtn.isWobble {
+    animation: none;
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn .mmText {
+    opacity: 1;
+    position: relative;
+    display: inline-block;
+    color: #000000;
+    mix-blend-mode: normal;
+    filter: none;
+    font-size: 18px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    font-weight: 750;
+    text-shadow: none;
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn .mmText::before,
+  .mainMenu.mainMenu--classic .mainMenuBtn .mmText::after {
+    content: none;
+  }
+
+  /* Per-button colors + icons */
+  .mainMenu.mainMenu--classic .mainMenuBtn--play {
+    --c1: #14f195;
+    --c2: #00d39a;
+    --c3: #00b0ff;
+    --textTint: #00d39a;
+    --g1: rgba(20,241,149,0.52);
+    --g2: rgba(0,211,154,0.52);
+    --g3: rgba(0,176,255,0.52);
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn--shop {
+    --c1: #ffe259;
+    --c2: #ffb300;
+    --c3: #ff6f00;
+    --textTint: #ffb300;
+    --g1: rgba(255,226,89,0.52);
+    --g2: rgba(255,179,0,0.52);
+    --g3: rgba(255,111,0,0.52);
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn--board {
+    --c1: #ffcf4a;
+    --c2: #ff7a00;
+    --c3: #ff3d00;
+    --textTint: #ff7a00;
+    --g1: rgba(255,207,74,0.52);
+    --g2: rgba(255,122,0,0.52);
+    --g3: rgba(255,61,0,0.52);
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn--settings {
+    --c1: #4aa3ff;
+    --c2: #2b79ff;
+    --c3: #00c2ff;
+    --textTint: #2b79ff;
+    --g1: rgba(74,163,255,0.52);
+    --g2: rgba(43,121,255,0.52);
+    --g3: rgba(0,194,255,0.52);
+  }
+
+  .mainMenu.mainMenu--classic .mainMenuBtn--about {
+    --c1: #b56cff;
+    --c2: #ff4db8;
+    --c3: #ff2e8a;
+    --textTint: #ff4db8;
+    --g1: rgba(181,108,255,0.52);
+    --g2: rgba(255,77,184,0.52);
+    --g3: rgba(255,46,138,0.52);
+  }
+
+  @media (max-width: 420px) {
+    .mainMenu.mainMenu--classic .mainMenuBtn {
+      height: 54px;
+      border-radius: 14px;
+      width: min(300px, 100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .mainMenu .mainMenuBtn.isBouncing,
+    .mainMenu .mainMenuBtn.isWobble,
+    .mainMenu .mainMenuBtn--play::before,
+    .mainMenu .mainMenuBtn::before {
+      animation: none !important;
+    }
+
+    .mainMenuTitle .t1,
+    .mainMenuTitle .t2,
+    .brandTitle .t1,
+    .brandTitle .t2 {
+      animation: none !important;
+    }
+    .mainMenuTitle .t1,
+    .brandTitle .t1 {
+      filter:
+        drop-shadow(0 0 8px rgba(45, 252, 255, 0.20))
+        drop-shadow(0 12px 26px rgba(0, 220, 255, 0.10));
+    }
+    .mainMenuTitle .t2,
+    .brandTitle .t2 {
+      filter:
+        drop-shadow(0 0 8px rgba(164, 99, 255, 0.18))
+        drop-shadow(0 12px 26px rgba(255, 80, 200, 0.10));
+    }
+    .mainMenu .mainMenuBtn::after {
+      animation: none !important;
+      opacity: 0 !important;
+    }
+    .mainMenu .mainMenuBtn,
+    .mainMenu .mainMenuBtn:active,
+    .mainMenu .mainMenuBtn.isPressed {
+      transition: none !important;
+      transform: none !important;
+    }
+
+    .mainMenu.mainMenu--glass .mainMenuBtn:hover::before {
+      animation: none !important;
+    }
+  }
+
+  .mainMenuBtn {
+    width: 100%;
+    height: 72px;
+    border-radius: 16px;
+    border: none;
+    position: relative;
+    overflow: hidden;
+    --btnGlow: rgba(0,255,255,0.16);
+    color: rgba(255,255,255,0.95);
+    font-weight: 900;
+    font-size: 18px;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    box-shadow:
+      0 24px 60px rgba(0,0,0,0.55),
+      0 0 0 1px rgba(255,255,255,0.14) inset,
+      0 0 0 1px rgba(0,0,0,0.35) inset;
+    transition: transform 120ms ease, filter 120ms ease, box-shadow 140ms ease;
+  }
+  .mainMenuBtn::before {
+    content: '';
+    position: absolute;
+    inset: -10% -12%;
+    background:
+      radial-gradient(120% 140% at 18% 15%, rgba(255,255,255,0.35), rgba(255,255,255,0.12) 35%, rgba(255,255,255,0) 62%),
+      radial-gradient(90% 120% at 80% 75%, rgba(255,255,255,0.10), rgba(255,255,255,0) 55%);
+    opacity: 0.75;
+    pointer-events: none;
+    mix-blend-mode: soft-light;
+    transition: opacity 140ms ease;
+  }
+  .mainMenuBtn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.10) inset,
+      0 1px 0 rgba(255,255,255,0.14) inset;
+    pointer-events: none;
+    opacity: 0.9;
+  }
+  .mainMenuBtn:hover {
+    filter: brightness(1.05) saturate(1.04);
+    box-shadow:
+      0 28px 72px rgba(0,0,0,0.58),
+      0 0 28px var(--btnGlow),
+      0 0 0 1px rgba(255,255,255,0.14) inset,
+      0 0 0 1px rgba(0,0,0,0.32) inset;
+  }
+  .mainMenuBtn:hover::before { opacity: 0.88; }
+  .mainMenuBtn:active { transform: translateY(1px); }
+  .mainMenuBtn:focus-visible {
+    outline: 2px solid rgba(0,255,255,0.55);
+    outline-offset: 3px;
+  }
+
+  .mainMenuBtn--play {
+    --btnGlow: rgba(0, 230, 118, 0.28);
+    background: linear-gradient(90deg, #00e676, #00b46a);
+  }
+
+  .mainMenuBtn--board {
+    --btnGlow: rgba(255, 77, 109, 0.30);
+    background: linear-gradient(90deg, #ff4d6d, #ff1f3d);
+  }
+
+  .mainMenuBtn--settings {
+    --btnGlow: rgba(0, 255, 255, 0.22);
+    background: linear-gradient(90deg, #4aa3ff, #00b0d7);
+  }
+
+  .mainMenuBtn--about {
+    --btnGlow: rgba(255, 80, 200, 0.26);
+    background: linear-gradient(90deg, #b067ff, #ff3fae);
+  }
+
+  .mainMenuBtn--shop {
+    --btnGlow: rgba(124, 77, 255, 0.28);
+    background: linear-gradient(90deg, #00e5ff, #7c4dff);
+  }
+
+
+  /* Desktop: revert to the original starry/gradient background (no hero/footer images) */
+  @media (min-width: 900px) and (hover:hover) and (pointer:fine) {
+    .mainMenuHero,
+    .mainMenuFooterArt {
+      display: none;
+    }
+  }
+
+  .mainMenuMeta {
+    margin-top: 8px;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: rgba(190, 220, 255, 0.55);
+  }
+

@@ -1,0 +1,1200 @@
+    /* ---------- Shooter HUD (COCKPIT FRAME) ---------- */
+    /* Inspired by the provided concept image: cockpit frame + top readouts.
+       Still performance-friendly: gradients + borders only, no heavy blur stacks. */
+    #igHud.igHud--cockpit {
+      --cockpitRadius: 20px;
+      --uiText: rgba(234,255,255,0.95);
+      --uiMuted: rgba(200, 230, 255, 0.72);
+      --uiStroke: rgba(255,255,255,0.14);
+      --uiInk: rgba(0,0,0,0.62);
+
+      /* Target frame sizing ("way bigger" on desktop, still responsive) */
+      --igTargetSize: min(420px, 48vw);
+      /* IMPORTANT: swatch (the actual target/yolk) stays fixed; only the frame scales */
+      --igTargetSwatchSize: 68px;
+      --igTargetSwatchOffsetX: 2px;
+      --igTargetSwatchOffsetY: -40px;
+      --igTargetTopAdjust: -26px;
+
+      position: absolute;
+      inset: 0;
+      z-index: 38;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* In cockpit HUD mode, we don't need the external header. */
+    #app.app--cockpit #topBar { display: none; }
+
+    /* Frame overlay */
+    #igHud.igHud--cockpit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--cockpitRadius);
+      background:
+        radial-gradient(1200px 680px at 50% 0%, rgba(0,255,255,0.08), rgba(0,0,0,0) 55%),
+        radial-gradient(900px 620px at 90% 10%, rgba(255, 120, 0, 0.08), rgba(0,0,0,0) 60%),
+        radial-gradient(900px 620px at 10% 10%, rgba(255, 80, 200, 0.06), rgba(0,0,0,0) 60%);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08) inset,
+        0 0 0 2px rgba(0,0,0,0.55) inset;
+      pointer-events: none;
+    }
+    #igHud.igHud--cockpit::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--cockpitRadius);
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.00) 40%),
+        linear-gradient(0deg, rgba(0,0,0,0.18), rgba(0,0,0,0.00) 45%);
+      pointer-events: none;
+    }
+
+    /* Treat panels as layout-free wrappers in cockpit mode */
+    #igHud.igHud--cockpit .igHudPanel,
+    #igHud.igHud--cockpit .igHudRightStack,
+    #igHud.igHud--cockpit .igHudRightMeta {
+      display: contents;
+    }
+
+    /* Top-left: LVL hex badge */
+    #igHud.igHud--cockpit .igStat--level {
+      position: absolute;
+      left: 14px;
+      top: 14px;
+      width: 74px;
+      height: 62px;
+      padding: 10px 12px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      gap: 2px;
+      border: 1px solid rgba(255, 190, 90, 0.35);
+      background:
+        radial-gradient(110% 140% at 20% 15%, rgba(255,255,255,0.16), rgba(255,255,255,0.06) 46%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(255, 150, 0, 0.22), rgba(0,0,0,0.55));
+      box-shadow:
+        0 18px 36px rgba(0,0,0,0.42),
+        0 0 22px rgba(255, 160, 0, 0.18);
+      border-radius: 16px;
+      clip-path: polygon(12% 0%, 88% 0%, 100% 50%, 88% 100%, 12% 100%, 0% 50%);
+    }
+    #igHud.igHud--cockpit .igStat--level::before { content: none; }
+    #igHud.igHud--cockpit .igStat--level .igLabel {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      color: rgba(255, 235, 210, 0.92);
+      margin: 0;
+    }
+    #igHud.igHud--cockpit .igStat--level .igValue {
+      font-weight: 1000;
+      font-size: 26px;
+      letter-spacing: 0.02em;
+      color: rgba(255, 244, 225, 0.98);
+      text-shadow: 0 0 20px rgba(255, 170, 40, 0.25), 0 2px 0 rgba(0,0,0,0.55);
+      line-height: 1;
+    }
+
+    /* Pause button lives in HUD (top-right) */
+    #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit {
+      position: absolute;
+      right: 14px;
+      top: 14px;
+      min-width: 86px;
+      height: 44px;
+      padding: 8px 12px;
+      border-radius: 14px;
+      background:
+        radial-gradient(120% 160% at 18% 15%, rgba(255,255,255,0.14), rgba(255,255,255,0.05) 55%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.42);
+      box-shadow:
+        0 16px 34px rgba(0,0,0,0.40),
+        0 0 0 1px rgba(0,255,255,0.18) inset,
+        0 0 22px rgba(0,255,255,0.10);
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      pointer-events: auto;
+    }
+
+    /* Top-right: cash badge (similar to level, smaller, below PAUSE) */
+    #igHud.igHud--cockpit .igStat--cash {
+      position: absolute;
+      right: 14px;
+      top: 66px;
+      width: 110px;
+      height: 54px;
+      padding: 10px 12px;
+      display: grid;
+      justify-items: center;
+      align-content: center;
+      gap: 2px;
+      border-radius: 16px;
+      border: 1px solid rgba(0,255,255,0.20);
+      background:
+        radial-gradient(110% 140% at 20% 15%, rgba(255,255,255,0.14), rgba(255,255,255,0.05) 46%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(0, 255, 255, 0.10), rgba(0,0,0,0.58));
+      box-shadow:
+        0 18px 36px rgba(0,0,0,0.40),
+        0 0 22px rgba(0,255,255,0.08);
+      clip-path: polygon(12% 0%, 88% 0%, 100% 50%, 88% 100%, 12% 100%, 0% 50%);
+    }
+    #igHud.igHud--cockpit .igStat--cash::before { content: none; }
+    #igHud.igHud--cockpit .igStat--cash .igLabel {
+      display: block;
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: rgba(210, 240, 255, 0.78);
+    }
+    #igHud.igHud--cockpit .igStat--cash .igValue {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 1000;
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      color: rgba(200, 255, 255, 0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.55);
+    }
+
+    /* Top-center: target orb + label */
+    #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+      position: absolute;
+      left: 50%;
+      top: calc(env(safe-area-inset-top) + 8px + var(--igTargetTopAdjust, 0px));
+      transform: translateX(-50%);
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      min-width: 0;
+    }
+
+    #igHud.igHud--cockpit .igTargetOrb {
+      width: var(--igTargetSize);
+      height: var(--igTargetSize);
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    #igHud.igHud--cockpit .igTargetRing {
+      width: var(--igTargetSize);
+      height: var(--igTargetSize);
+      border-radius: 999px;
+      position: relative;
+      background: none;
+      border: none;
+      box-shadow: none;
+      display: grid;
+      place-items: center;
+    }
+
+    /* Target frame asset (has transparent center) */
+    #igHud.igHud--cockpit .igTargetRing::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url('assets/yolk-frame_transp_cyber.png') center / contain no-repeat;
+      filter: drop-shadow(0 18px 36px rgba(0,0,0,0.45));
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    #igHud.igHud--cockpit #igTargetSwatch.igSwatch {
+      position: relative;
+      z-index: 1;
+      width: var(--igTargetSwatchSize);
+      height: var(--igTargetSwatchSize);
+      border-radius: 999px;
+      border: none;
+      background: rgba(0,0,0,0.25);
+      box-shadow: none;
+      transform: translate(var(--igTargetSwatchOffsetX, 0px), var(--igTargetSwatchOffsetY, 0px));
+    }
+
+    /* Target label uses the existing #nextColorName value */
+    #igHud.igHud--cockpit .igTargetText--cockpit {
+      display: grid;
+      justify-items: center;
+      gap: 0;
+      padding: 8px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(0,255,255,0.18);
+      background: rgba(0,0,0,0.30);
+      box-shadow: 0 16px 34px rgba(0,0,0,0.40);
+    }
+    #igHud.igHud--cockpit #igTargetWord { display: none; }
+    #igHud.igHud--cockpit #nextColorName {
+      font-weight: 1000;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(160, 255, 255, 0.96);
+      text-shadow: 0 0 18px rgba(0,255,255,0.14), 0 2px 0 rgba(0,0,0,0.55);
+    }
+
+    /* Left: vertical energy tube */
+    #igHud.igHud--cockpit #igEnergy {
+      position: absolute;
+      left: 16px;
+      top: 110px;
+      display: grid;
+      justify-items: start;
+      gap: 8px;
+    }
+    #igHud.igHud--cockpit .igEnergyLabel { display: none; }
+    #igHud.igHud--cockpit .igEnergyBar {
+      width: 42px;
+      height: 160px;
+      border-radius: 18px;
+      background:
+        radial-gradient(120% 140% at 30% 20%, rgba(255,255,255,0.18), rgba(255,255,255,0.05) 45%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.40);
+      border: 1px solid rgba(0,255,255,0.20);
+      box-shadow:
+        0 18px 38px rgba(0,0,0,0.42),
+        0 0 22px rgba(0,255,255,0.10);
+      overflow: hidden;
+      position: relative;
+    }
+    #igHud.igHud--cockpit .igEnergyFill {
+      top: auto;
+      bottom: 0;
+      left: 0;
+      width: 100% !important;
+      height: calc(var(--p) * 100%) !important;
+      border-radius: 16px;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(255,255,255,0.10) 0 7px,
+          rgba(255,255,255,0.02) 7px 12px
+        ),
+        linear-gradient(0deg, var(--accent), rgba(255,255,255,0.28));
+      box-shadow: 0 0 18px var(--accentGlow, rgba(102,204,255,0.20));
+    }
+    #igHud.igHud--cockpit .igEnergyCore { display: none; }
+    #igHud.igHud--cockpit .igEnergyBar .igEnergyPct {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      transform: rotate(-90deg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      color: rgba(200,255,255,0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+
+    /* Right: rocket lives */
+    #igHud.igHud--cockpit #livesOverlay.igLives {
+      position: absolute;
+      right: 16px;
+      top: 110px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 180, 0, 0.20);
+      background: rgba(0,0,0,0.32);
+      box-shadow: 0 18px 36px rgba(0,0,0,0.40);
+      filter: none;
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives .igLabel { display: none; }
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer {
+      counter-reset: lives;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* Lives are rendered as <span class="heart">…</span> — restyle as rockets in cockpit theme */
+    #igHud.igHud--cockpit #livesOverlay.igLives .heart {
+      counter-increment: lives;
+      width: 22px;
+      height: 22px;
+      border-radius: 8px;
+      position: relative;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(180, 200, 220, 0.88));
+      box-shadow: 0 10px 22px rgba(0,0,0,0.25);
+      transform: none;
+      animation: none;
+      clip-path: polygon(50% 0%, 72% 20%, 72% 68%, 50% 100%, 28% 68%, 28% 20%);
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives .heart::before {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: -8px;
+      width: 10px;
+      height: 10px;
+      transform: translateX(-50%) rotate(45deg);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.50), rgba(255, 160, 0, 0.85));
+      border-radius: 3px;
+      filter: drop-shadow(0 0 10px rgba(255, 160, 0, 0.25));
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives .heart::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 6px;
+      width: 8px;
+      height: 8px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: radial-gradient(circle at 35% 35%, rgba(45,252,255,0.75), rgba(0, 120, 200, 0.65));
+      box-shadow: 0 0 10px rgba(0,255,255,0.16);
+    }
+
+    /* Numeric lives counter next to a single rocket icon */
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer .heart {
+      opacity: 0;
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer .heart:first-child {
+      opacity: 1;
+      position: relative;
+      left: 0;
+      top: 0;
+      transform: none;
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer::after {
+      content: ' ' counter(lives);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 1000;
+      font-size: 16px;
+      letter-spacing: 0.06em;
+      color: rgba(234,255,255,0.94);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+    }
+
+    /* Hide the active power-up overlay in cockpit mode (keeps things clean) */
+    #igHud.igHud--cockpit #topRightHud { display: none; }
+
+    /* Responsive: smaller HUD on narrow screens */
+    @media (max-width: 900px) {
+      #igHud.igHud--cockpit {
+        --cockpitRadius: 0px;
+        --igTargetSize: min(260px, 68vw);
+        --igTargetSwatchSize: 44px;
+        --igTargetSwatchOffsetX: 3px;
+        --igTargetSwatchOffsetY: -25px;
+        --igTargetTopAdjust: -18px;
+      }
+      #igHud.igHud--cockpit::before,
+      #igHud.igHud--cockpit::after {
+        border-radius: 0;
+      }
+      #igHud.igHud--cockpit .igStat--level { left: 10px; top: 10px; width: 66px; height: 56px; }
+      #igHud.igHud--cockpit .igStat--level .igValue { font-size: 22px; }
+
+      #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit { right: 10px; top: 10px; height: 40px; min-width: 78px; }
+
+      #igHud.igHud--cockpit .igStat--cash { right: 10px; top: 58px; width: 98px; height: 50px; }
+      #igHud.igHud--cockpit .igStat--cash .igValue { font-size: 16px; }
+
+      #igHud.igHud--cockpit #igTarget.igTarget--cockpit { top: calc(env(safe-area-inset-top) + 6px + var(--igTargetTopAdjust, 0px)); }
+      #igHud.igHud--cockpit #nextColorName { font-size: 15px; }
+
+      #igHud.igHud--cockpit #igEnergy { left: 10px; top: 96px; }
+      #igHud.igHud--cockpit .igEnergyBar { height: 132px; width: 38px; }
+      #igHud.igHud--cockpit #livesOverlay.igLives { right: 10px; top: 96px; padding: 8px 10px; }
+      #igHud.igHud--cockpit #livesOverlay.igLives .heart { width: 20px; height: 20px; }
+    }
+
+    /* ---------- Shooter HUD (SCI-FI PLATE / CONSOLE) ---------- */
+    /* Inspired by the reference image: metal UI plates + neon indicators.
+       Performance-first: no backdrop-filter, no mix-blend, no big filters/animations. */
+    #igHud.igHud--sciFiPlate {
+      --uiMetal1: rgba(18, 24, 38, 0.92);
+      --uiMetal2: rgba(10, 14, 22, 0.92);
+      --uiStroke: rgba(255,255,255,0.12);
+      --uiInk: rgba(0,0,0,0.72);
+      --uiGlowCyan: rgba(45, 252, 255, 0.16);
+      --uiGlowGreen: rgba(112, 255, 122, 0.18);
+      --uiText: rgba(234,255,255,0.94);
+      --uiMuted: rgba(200, 230, 255, 0.70);
+
+      position: absolute;
+      top: calc(10px + env(safe-area-inset-top));
+      left: calc(12px + env(safe-area-inset-left));
+      transform: none;
+      width: min(560px, calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+      z-index: 38;
+
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-rows: auto auto;
+      grid-template-areas:
+        "left center right"
+        "left . right";
+      column-gap: 12px;
+      row-gap: 10px;
+
+      pointer-events: none;
+      user-select: none;
+      overflow: visible;
+    }
+
+    #igHud.igHud--sciFiPlate .igHudPanel--left {
+      grid-area: left;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 0;
+    }
+
+    #igHud.igHud--sciFiPlate .igHudPanel--center {
+      grid-area: center;
+      justify-content: flex-start;
+      padding: 0;
+    }
+
+    #igHud.igHud--sciFiPlate .igHudPanel--right {
+      grid-area: right;
+      flex-direction: column;
+      align-items: flex-end;
+      justify-content: flex-start;
+      gap: 10px;
+      padding: 0;
+    }
+
+    /* Level ring */
+    #igHud.igHud--sciFiPlate .igStat--level {
+      width: 72px;
+      height: 72px;
+      border-radius: 999px;
+      padding: 0;
+      display: grid;
+      place-items: center;
+      gap: 0;
+
+      /* Performance-friendly ring: simple radial gradients (no mask/conic). */
+      background:
+        radial-gradient(circle at 50% 50%, rgba(0,0,0,0.52) 0 54%, rgba(112,255,122,0.92) 56% 63%, rgba(45,252,255,0.45) 63% 66%, rgba(0,0,0,0.00) 69%),
+        radial-gradient(circle at 50% 42%, rgba(255,255,255,0.10), rgba(255,255,255,0.00) 60%);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.26);
+    }
+
+    #igHud.igHud--sciFiPlate .igStat--level::before {
+      content: none;
+    }
+
+    #igHud.igHud--sciFiPlate .igStat--level .igLabel,
+    #igHud.igHud--sciFiPlate .igStat--level .igValue {
+      position: relative;
+      z-index: 1;
+    }
+
+    #igHud.igHud--sciFiPlate .igStat--level .igLabel {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: rgba(210,240,255,0.78);
+      margin-top: 10px;
+    }
+
+    #igHud.igHud--sciFiPlate .igStat--level .igValue {
+      margin-top: -2px;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      font-weight: 1000;
+      color: rgba(230,255,240,0.95);
+      text-shadow: 0 0 18px rgba(112,255,122,0.16), 0 2px 0 rgba(0,0,0,0.55);
+    }
+
+    #igHud.igHud--sciFiPlate .igStat--level::after { content: none; }
+
+    /* Cash pill */
+    #igHud.igHud--sciFiPlate .igStat--cash {
+      border-radius: 12px;
+      padding: 10px 12px;
+      gap: 8px;
+      min-width: 180px;
+    }
+    #igHud.igHud--sciFiPlate .igStat--cash::before {
+      width: 10px;
+      height: 10px;
+      background: #5dff7b;
+      box-shadow: 0 0 12px rgba(112,255,122,0.14);
+    }
+    #igHud.igHud--sciFiPlate .igStat--cash .igLabel {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: rgba(210,240,255,0.70);
+    }
+    #igHud.igHud--sciFiPlate .igStat--cash .igValue {
+      font-size: 18px;
+      letter-spacing: 0.04em;
+      color: rgba(160,255,190,0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.55);
+    }
+    #igHud.igHud--sciFiPlate .igStat--cash {
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(0,0,0,0.26);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.22);
+    }
+
+    /* Center target module */
+    #igHud.igHud--sciFiPlate #igTarget {
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      min-width: 0;
+      background: rgba(0,0,0,0.26);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.22);
+    }
+
+    #igHud.igHud--sciFiPlate .igTargetBadge {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: rgba(210,240,255,0.82);
+      box-shadow: none;
+      white-space: nowrap;
+    }
+
+    #igHud.igHud--sciFiPlate .igWord {
+      font-size: 11px;
+      letter-spacing: 0.20em;
+      opacity: 0.92;
+      color: rgba(234,255,255,0.90);
+    }
+    #igHud.igHud--sciFiPlate .igTargetName {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      opacity: 0.96;
+    }
+
+    #igHud.igHud--sciFiPlate .igSwatch {
+      width: 32px;
+      height: 32px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 0 14px rgba(45,252,255,0.08);
+      background: rgba(0,0,0,0.18);
+    }
+
+    /* Energy module */
+    #igHud.igHud--sciFiPlate #igEnergy {
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    #igHud.igHud--sciFiPlate .igEnergyLabel {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: rgba(210,240,255,0.70);
+    }
+
+    #igHud.igHud--sciFiPlate .igEnergyBar {
+      width: clamp(160px, 22vw, 220px);
+      height: 14px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
+      box-shadow: 0 10px 18px rgba(0,0,0,0.22);
+    }
+
+    #igHud.igHud--sciFiPlate .igEnergyFill {
+      background: linear-gradient(90deg, var(--accent), rgba(255,255,255,0.28));
+      box-shadow: none;
+    }
+
+    /* Disable the animated shimmer layer for performance. */
+    #igHud.igHud--sciFiPlate .igEnergyCore {
+      display: none;
+      animation: none;
+    }
+
+    #igHud.igHud--sciFiPlate .igEnergyBar .igEnergyPct {
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+    }
+
+    /* Lives row: yolk faces */
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      filter: none;
+    }
+
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .igLabel {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      color: rgba(210,240,255,0.70);
+    }
+
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart {
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      position: relative;
+      background:
+        radial-gradient(circle at 35% 30%, rgba(255,255,255,0.92) 0 16%, rgba(255,255,255,0.45) 28%, rgba(0,0,0,0) 60%),
+        radial-gradient(circle at 50% 58%, #ffe680 0 30%, #ffbf2f 58%, #ff7a18 84%);
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow: 0 0 14px rgba(255, 180, 60, 0.10);
+      transform: none;
+      animation: none;
+    }
+
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:before,
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      width: 3px;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(50, 20, 10, 0.72);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.12);
+    }
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:before { left: 6px; }
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:after { right: 6px; }
+
+    /* Mobile: keep this as a compact 2-row console */
+    /* Tablet/phone HUD layout (robust absolute positioning):
+       - Lives: top-left
+       - Target: top-center (badge + ring only)
+       - Level: top-right
+       - Energy: vertical battery under level
+    */
+    @media (max-width: 900px) {
+      #igHud.igHud--sciFiPlate {
+        --hudPad: 10px;
+
+        /* Leave room for the top-right pause button overlay */
+        top: calc(64px + env(safe-area-inset-top));
+        left: calc(var(--hudPad) + env(safe-area-inset-left));
+        right: calc(var(--hudPad) + env(safe-area-inset-right));
+        width: auto;
+
+        display: block;
+        height: 0;
+      }
+
+      /* Remove panel wrappers from the layout entirely. */
+      #igHud.igHud--sciFiPlate .igHudPanel,
+      #igHud.igHud--sciFiPlate .igHudRightStack,
+      #igHud.igHud--sciFiPlate .igHudRightMeta {
+        display: contents;
+      }
+      #igHud.igHud--sciFiPlate #topRightHud { display: none; }
+
+      /* Lives: heart icon + count */
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives {
+        position: absolute;
+        left: 0;
+        top: 0;
+      }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .igLabel { display: none; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer {
+        counter-reset: lives;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        position: relative;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(0,0,0,0.18);
+        border: 1px solid rgba(255,255,255,0.12);
+        box-shadow: 0 10px 18px rgba(0,0,0,0.22);
+      }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer .heart {
+        counter-increment: lives;
+        opacity: 0;
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer .heart:first-child {
+        opacity: 1;
+        position: relative;
+        left: 0;
+        top: 0;
+        transform: none;
+        width: 18px;
+        height: 18px;
+      }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer::after {
+        content: " " counter(lives);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-weight: 950;
+        font-size: 12px;
+        letter-spacing: 0.06em;
+        color: rgba(234,255,255,0.94);
+        text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+      }
+
+      /* Target: badge + ring only, no square container */
+      #igHud.igHud--sciFiPlate #igTarget {
+        position: absolute;
+        left: 50%;
+        top: 0;
+        transform: translateX(-50%);
+        width: min(260px, 52vw);
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        padding: 0;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
+      #igHud.igHud--sciFiPlate #igTarget .igTargetText { display: none; }
+      #igHud.igHud--sciFiPlate #igTargetWord { display: none; }
+      #igHud.igHud--sciFiPlate #nextColorName { display: none; }
+      #igHud.igHud--sciFiPlate #igTargetSwatch {
+        width: 54px;
+        height: 54px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.14);
+        background: rgba(0,0,0,0.18);
+        box-shadow:
+          0 0 0 2px rgba(112,255,122,0.22),
+          0 0 0 6px rgba(45,252,255,0.10),
+          0 14px 30px rgba(0,0,0,0.30);
+      }
+
+      /* Level: top-right */
+      #igHud.igHud--sciFiPlate .igStat--level {
+        position: absolute;
+        right: 0;
+        top: 0;
+        width: 64px;
+        height: 64px;
+      }
+      #igHud.igHud--sciFiPlate .igStat--level .igValue { font-size: 20px; }
+
+      /* Cash hidden on mobile/tablet per the requested ordering. */
+      #igHud.igHud--sciFiPlate .igStat--cash { display: none; }
+
+      /* Energy battery under level */
+      #igHud.igHud--sciFiPlate #igEnergy {
+        position: absolute;
+        right: 0;
+        top: 72px;
+        align-items: flex-end;
+        gap: 0;
+      }
+      #igHud.igHud--sciFiPlate .igEnergyLabel { display: none; }
+      #igHud.igHud--sciFiPlate .igEnergyBar {
+        width: 18px;
+        height: 104px;
+        border-radius: 12px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid rgba(255,255,255,0.14);
+        box-shadow:
+          0 12px 22px rgba(0,0,0,0.22),
+          0 0 0 1px rgba(0,0,0,0.45) inset;
+        overflow: visible;
+      }
+      #igHud.igHud--sciFiPlate .igEnergyBar::before {
+        content: '';
+        position: absolute;
+        top: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 10px;
+        height: 5px;
+        border-radius: 6px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.14);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.18);
+      }
+      #igHud.igHud--sciFiPlate .igEnergyFill {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        width: 100% !important;
+        height: calc(var(--p) * 100%) !important;
+        background:
+          repeating-linear-gradient(
+            0deg,
+            rgba(255,255,255,0.10) 0 6px,
+            rgba(255,255,255,0.02) 6px 10px
+          ),
+          linear-gradient(0deg, var(--accent), rgba(255,255,255,0.35));
+        transform-origin: center bottom;
+        border-radius: 10px;
+        box-shadow: 0 0 18px var(--accentGlow, rgba(102,204,255,0.22));
+      }
+      #igHud.igHud--sciFiPlate .igEnergyBar .igEnergyPct {
+        inset: auto;
+        position: absolute;
+        right: calc(100% + 8px);
+        top: 50%;
+        transform: translateY(-50%);
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.08em;
+        white-space: nowrap;
+      }
+    }
+
+    /* Base panels */
+    .igHudPanel {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      min-height: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      overflow: visible;
+      clip-path: none;
+    }
+    .igHudPanel::before,
+    .igHudPanel::after {
+      content: none;
+    }
+
+    .igHudPanel--left { grid-area: left; justify-content: flex-start; }
+    .igHudPanel--center { grid-area: center; justify-content: center; min-width: 0; }
+    .igHudPanel--right { grid-area: right; justify-content: flex-end; gap: clamp(8px, 1.2vw, 12px); }
+
+    .igStat {
+      --accent: #66ccff;
+      --accentGlow: rgba(102, 204, 255, 0.16);
+      display: inline-flex;
+      align-items: baseline;
+      gap: clamp(6px, 1vw, 8px);
+      padding: clamp(4px, 0.85vw, 6px) clamp(8px, 1.3vw, 10px);
+      border-radius: 999px;
+      background:
+        radial-gradient(120% 180% at 18% 10%, rgba(255,255,255,0.16), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.14);
+      box-shadow:
+        0 12px 22px rgba(0,0,0,0.18),
+        0 0 18px var(--accentGlow);
+      min-width: 0;
+      text-align: left;
+    }
+
+    .igStat::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 16px var(--accentGlow);
+      opacity: 0.9;
+      flex: 0 0 auto;
+    }
+
+    .igLabel {
+      font-weight: 950;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(200, 235, 255, 0.78);
+      white-space: nowrap;
+    }
+
+    .igValue {
+      font-weight: 950;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      color: rgba(234,255,255,0.96);
+      text-shadow: 0 0 14px rgba(0,255,255,0.16), 0 0 10px rgba(0,0,0,0.65);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .igHudLegacySwatch {
+      position: absolute;
+      left: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .igHudRightStack {
+      display: flex;
+      align-items: center;
+      gap: clamp(8px, 1.2vw, 12px);
+      pointer-events: none;
+    }
+
+    .igHudRightMeta {
+      display: flex;
+      align-items: center;
+      pointer-events: none;
+      max-width: min(38vw, 320px);
+    }
+
+    .igPauseBtn {
+      pointer-events: auto;
+      user-select: none;
+      appearance: none;
+      border: none;
+      border-radius: 14px;
+      padding: 8px 10px;
+      min-width: 74px;
+      background:
+        radial-gradient(120% 160% at 18% 15%, rgba(255,255,255,0.16), rgba(255,255,255,0.05) 55%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.36);
+      color: rgba(234,255,255,0.96);
+      font-weight: 950;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      box-shadow:
+        0 14px 30px rgba(0,0,0,0.30),
+        0 0 0 1px rgba(0,255,255,0.18) inset,
+        0 0 0 1px rgba(0,0,0,0.44) inset,
+        0 0 20px rgba(0,255,255,0.10);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      cursor: pointer;
+      transition: transform 110ms ease, filter 120ms ease, box-shadow 140ms ease;
+      white-space: nowrap;
+    }
+    .igPauseBtn:hover {
+      filter: brightness(1.06);
+      box-shadow:
+        0 16px 34px rgba(0,0,0,0.32),
+        0 0 0 1px rgba(0,255,255,0.24) inset,
+        0 0 0 1px rgba(0,0,0,0.44) inset,
+        0 0 26px rgba(0,255,255,0.14);
+    }
+    .igPauseBtn:active { transform: translateY(1px) scale(0.99); }
+    .igPauseBtn:focus-visible { outline: 2px solid rgba(0,255,255,0.45); outline-offset: 3px; }
+
+    /* Lives: just hearts (no box) */
+    #livesOverlay.igLives {
+      --accent: #ff4d6d;
+      --accentGlow: rgba(255, 77, 109, 0.16);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      filter: drop-shadow(0 0 14px var(--accentGlow));
+    }
+    #livesOverlay.igLives #livesContainer { display:flex; gap:6px; }
+    #livesOverlay.igLives .heart { width:12px; height:12px; box-shadow: 0 0 18px rgba(255, 77, 109, 0.14); }
+    #livesOverlay.igLives .heart:before, #livesOverlay.igLives .heart:after { width:12px; height:12px; }
+    #livesOverlay.igLives .heart:before { top:-6px; }
+    #livesOverlay.igLives .heart:after { left:6px; }
+
+    @keyframes lifeLostPulse {
+      0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,0,90,0)); }
+      30% { transform: scale(1.06); filter: drop-shadow(0 0 22px rgba(255,0,90,0.55)); }
+      100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(255,0,90,0)); }
+    }
+    #livesOverlay.lifeLost { animation: lifeLostPulse 320ms ease; }
+
+    /* ---------- Center target (fits inside cockpit) ---------- */
+    #igTarget {
+      --accent: #66ccff;
+      --accentGlow: rgba(102, 204, 255, 0.28);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .igTargetBadge {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background:
+        radial-gradient(120% 160% at 18% 10%, rgba(255,255,255,0.18), rgba(255,255,255,0.06) 55%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.18);
+      border: 1px solid rgba(255,255,255,0.16);
+      color: rgba(234,255,255,0.88);
+      box-shadow:
+        0 10px 18px rgba(0,0,0,0.18),
+        0 0 18px var(--accentGlow, rgba(102,204,255,0.28));
+      opacity: 0.95;
+      white-space: nowrap;
+    }
+
+    .igTargetText {
+      display: grid;
+      gap: 2px;
+      align-content: center;
+      justify-items: start;
+    }
+
+    .igTargetName {
+      font-weight: 950;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(234,255,255,0.96);
+      text-shadow:
+        0 0 14px rgba(0,0,0,0.65),
+        0 0 26px var(--accentGlow, rgba(102,204,255,0.28));
+      opacity: 0.95;
+      white-space: nowrap;
+      min-height: 1em;
+    }
+
+    .igWord {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 12px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: rgba(240, 255, 255, 0.92);
+      text-shadow:
+        0 0 14px rgba(0,0,0,0.65),
+        0 0 22px var(--accentGlow, rgba(102,204,255,0.28));
+      opacity: 0.92;
+      white-space: nowrap;
+    }
+
+    .igSwatch {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      border: 2px solid rgba(255,255,255,0.22);
+      background: rgba(0,0,0,0.10);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.45) inset,
+        0 0 18px rgba(255,255,255,0.05),
+        0 0 26px var(--accentGlow, rgba(102, 204, 255, 0.28));
+    }
+
+    @keyframes igWordPulse {
+      0% { filter: brightness(1); transform: translateZ(0); }
+      30% { filter: brightness(1.25); }
+      100% { filter: brightness(1); }
+    }
+    .igWord.igPulse { animation: igWordPulse 360ms ease; }
+
+    #igEnergy {
+      --p: 1;
+      --accent: #66ccff;
+      --accentGlow: rgba(102, 204, 255, 0.20);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 4px;
+    }
+
+    .igEnergyBar {
+      position: relative;
+      width: clamp(66px, 12vw, 102px);
+      height: 10px;
+      border-radius: 999px;
+      background:
+        radial-gradient(120% 180% at 18% 10%, rgba(255,255,255,0.14), rgba(255,255,255,0.06) 46%, rgba(255,255,255,0) 72%),
+        rgba(255,255,255,0.06);
+      box-shadow:
+        0 0 0 1px rgba(0,0,0,0.35) inset,
+        0 0 20px rgba(0,0,0,0.25),
+        0 0 28px var(--accentGlow, rgba(102, 204, 255, 0.22));
+      overflow: hidden;
+    }
+
+    .igEnergyBar .igEnergyPct {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.92);
+      text-shadow:
+        0 1px 0 rgba(0,0,0,0.65),
+        0 0 16px var(--accentGlow, rgba(102,204,255,0.22));
+      pointer-events: none;
+      user-select: none;
+    }
+
+    /* Energy fill: crystal/capacitor look */
+    .igEnergyFill {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: calc(var(--p) * 100%);
+      background:
+        linear-gradient(90deg,
+          rgba(255,255,255,0.10),
+          rgba(255,255,255,0.06) 20%,
+          rgba(255,255,255,0.02) 40%,
+          rgba(255,255,255,0.08) 60%,
+          rgba(255,255,255,0.02) 80%,
+          rgba(255,255,255,0.08)
+        ),
+        linear-gradient(90deg,
+          var(--accent),
+          rgba(255,255,255,0.35)
+        );
+      filter: saturate(1.2);
+      box-shadow: 0 0 18px var(--accentGlow, rgba(102,204,255,0.22));
+      transform-origin: left center;
+    }
+
+    /* Extra small phones: keep the sci-fi HUD compact */
+    @media (max-width: 520px) {
+      #igHud.igHud--sciFiPlate { left: calc(8px + env(safe-area-inset-left)); top: calc(8px + env(safe-area-inset-top)); }
+      #igHud.igHud--sciFiPlate .igHudPanel { gap: 8px; }
+    }
+
+    @media (max-width: 420px) {
+      #igHud.igHud--sciFiPlate .igHudPanel--left .igStat:nth-child(2) { display: none; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives #livesContainer { gap: 4px; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart { width: 10px; height: 10px; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:before,
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:after { width: 10px; height: 10px; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:before { top: -5px; }
+      #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart:after { left: 5px; }
+      #igHud.igHud--sciFiPlate .igEnergyBar { width: clamp(120px, 42vw, 200px); height: 12px; }
+      #igHud.igHud--sciFiPlate .igSwatch { width: 28px; height: 28px; }
+      #igHud.igHud--sciFiPlate .igWord { max-width: 44vw; overflow: hidden; text-overflow: ellipsis; }
+    }
+

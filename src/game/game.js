@@ -7,7 +7,7 @@ import {
   LIFE_DROP_CHANCE,
   POWERUP_TYPES,
   TROPHIES,
-} from './constants.js';
+} from '../shared/constants.js';
 
 import {
   addLeaderboardEntry,
@@ -31,7 +31,7 @@ import {
   savePlayerName,
   saveUltimateType,
   saveUltimateUpgrades,
-} from './storage.js';
+} from '../platform/storage.js';
 
 import {
   updateHud,
@@ -45,7 +45,7 @@ import {
   renderScores,
   openModal,
   closeModal,
-} from './ui.js';
+} from '../ui/ui.js';
 
 import { createNeonMap, circleIntersectsRect, resolveCircleVsRect } from './map.js';
 
@@ -53,9 +53,9 @@ import { createRenderer3D } from './renderer3d.js';
 
 import { colorToRGBA, initEnemyBlob, updateEnemyBlob, drawJellyBlobEnemy } from './enemy2d.js';
 
-import { evaluateRunMilestones } from './achievements.js';
+import { evaluateRunMilestones } from '../ui/achievements.js';
 
-import { syncMainMenuUi, openLevelSelectModal, installMenuBindings, createMenuActions } from './menus.js';
+import { syncMainMenuUi, openLevelSelectModal, installMenuBindings, createMenuActions } from '../ui/menus.js';
 
 export function createGame(ui) {
   const canvas = ui.canvas;
@@ -64,7 +64,7 @@ export function createGame(ui) {
   const renderer3d = createRenderer3D(ui.glCanvas);
   // Let the 3D renderer draw the NEXT enemy preview into the HUD swatch.
   if (renderer3d && typeof renderer3d.setNextEnemyPreviewCanvas === 'function') {
-    renderer3d.setNextEnemyPreviewCanvas(ui.nextColorSwatchEl);
+    renderer3d.setNextEnemyPreviewCanvas(ui.igTargetSwatchEl || ui.nextColorSwatchEl);
   }
 
   // Viewport size in CSS pixels (canvas backing store is scaled by DPR)
@@ -855,6 +855,11 @@ export function createGame(ui) {
   // Automatic shooting
   let shootDelayMs = 250;
   let lastShotTimeMs = 0;
+
+  // Movement intent for renderer VFX (thruster flames). Updated each tick in update().
+  let lastWantsMove = false;
+  let lastMoveIntentX = 0;
+  let lastMoveIntentY = 0;
 
   function createSfxPool(src, { poolSize = 6, volume = 0.09 } = {}) {
     const pool = [];
@@ -1981,21 +1986,28 @@ export function createGame(ui) {
   }
 
   function shootBullet() {
+    const muzzleDist = player.radius + bulletRadius + 6;
     if (shotgunActive) {
       const pellets = 5;
       ensureBulletCapacity(pellets);
       for (let i = 0; i < pellets; i++) {
         const spread = (Math.random() - 0.5) * 0.5;
         const a = aimAngle + spread;
-        bullets.push({ x: player.x, y: player.y, vx: Math.cos(a), vy: Math.sin(a), seed: Math.random() * Math.PI * 2 });
+        const mx = player.x + Math.cos(a) * muzzleDist;
+        const my = player.y + Math.sin(a) * muzzleDist;
+        bullets.push({ x: mx, y: my, vx: Math.cos(a), vy: Math.sin(a), seed: Math.random() * Math.PI * 2 });
       }
-      spawnMuzzle(player.x, player.y);
-      spawnCircleBurst(player.x, player.y, 'rgba(0,0,0,0.4)', 6, 16);
+      const mx = player.x + Math.cos(aimAngle) * muzzleDist;
+      const my = player.y + Math.sin(aimAngle) * muzzleDist;
+      spawnMuzzle(mx, my);
+      spawnCircleBurst(mx, my, 'rgba(0,0,0,0.4)', 6, 16);
       bulletSfx.play();
     } else {
       ensureBulletCapacity(1);
-      bullets.push({ x: player.x, y: player.y, vx: Math.cos(aimAngle), vy: Math.sin(aimAngle), seed: Math.random() * Math.PI * 2 });
-      spawnMuzzle(player.x, player.y);
+      const mx = player.x + Math.cos(aimAngle) * muzzleDist;
+      const my = player.y + Math.sin(aimAngle) * muzzleDist;
+      bullets.push({ x: mx, y: my, vx: Math.cos(aimAngle), vy: Math.sin(aimAngle), seed: Math.random() * Math.PI * 2 });
+      spawnMuzzle(mx, my);
       bulletSfx.play();
     }
   }
@@ -2040,6 +2052,9 @@ export function createGame(ui) {
         cam: camera,
         map,
         player,
+        thrusting: lastWantsMove,
+        moveIntentX: lastMoveIntentX,
+        moveIntentY: lastMoveIntentY,
         energyRatio: clamp(player.energy / ENERGY_MAX, 0, 1),
         energyFullFxUntilMs,
         aimAngle,
@@ -2515,6 +2530,9 @@ export function createGame(ui) {
     const moveMag = Math.hypot(moveX, moveY);
     // For docking logic, ignore tiny drift.
     const wantsMove = moveMag > ENERGY_CONNECT_MOVE_EPS;
+    lastWantsMove = wantsMove;
+    lastMoveIntentX = moveX;
+    lastMoveIntentY = moveY;
     updateEnergyDock(nowMs, { wantsMove });
 
     const inRechargeField = energyDock.phase === 'charging';
@@ -3341,6 +3359,18 @@ export function createGame(ui) {
     // Responsive canvas sizing (bigger playfield on big screens)
     resizeCanvasToCssSize();
     window.addEventListener('resize', resizeCanvasToCssSize);
+
+    // Mobile browsers (especially iOS Safari) can change the visual viewport
+    // (URL bar collapse/expand, keyboard) without reliably emitting window resize.
+    // Keep canvas size + input rect in sync.
+    const vv = globalThis.visualViewport;
+    if (vv && vv.addEventListener) {
+      vv.addEventListener('resize', resizeCanvasToCssSize);
+      vv.addEventListener('scroll', () => {
+        resizeCanvasToCssSize();
+        refreshCanvasRect();
+      }, { passive: true });
+    }
 
     // Touch controls
     installJoystick(ui.moveStick, ui.moveKnob, axes.move);

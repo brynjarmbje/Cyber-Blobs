@@ -1,4 +1,4 @@
-import { saveAchievements } from './storage.js';
+import { saveAchievements } from '../platform/storage.js';
 
 // Minimal "prizes" system: unlock milestones and award bonus cash.
 // Return { unlocked: string[], bonusCash: number }

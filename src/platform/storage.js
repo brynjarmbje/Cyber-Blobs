@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { STORAGE_KEYS } from './constants.js';
+import { STORAGE_KEYS } from '../shared/constants.js';
 
 function safeParseJson(value, fallback) {
   if (typeof value !== 'string' || value.length === 0) return fallback;

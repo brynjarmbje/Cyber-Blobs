@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { TROPHIES, POWERUP_TYPES } from './constants.js';
+import { TROPHIES, POWERUP_TYPES } from '../shared/constants.js';
 
 export function getUiElements() {
   return {
@@ -37,6 +37,11 @@ export function getUiElements() {
     hudEnergyEl: document.getElementById('hudEnergy'),
     nextColorSwatchEl: document.getElementById('nextColorSwatch'),
     nextColorNameEl: document.getElementById('nextColorName'),
+    igTargetWidgetEl: document.getElementById('igTarget'),
+    igTargetSwatchEl: document.getElementById('igTargetSwatch'),
+    igEnergyWidgetEl: document.getElementById('igEnergy'),
+    igTargetWordEl: document.getElementById('igTargetWord'),
+    igEnergyPctEl: document.getElementById('igEnergyPct'),
     livesContainerEl: document.getElementById('livesContainer'),
     livesOverlay: document.getElementById('livesOverlay'),
     activeOverlayEl: document.getElementById('activeOverlay'),
@@ -155,8 +160,39 @@ export function updateHud(ui, state) {
   }
 
   // NEXT target: rendered by the 3D renderer into the swatch canvas.
-  if (ui.nextColorSwatchEl) ui.nextColorSwatchEl.title = nextColor ? `Target: ${nextColor}` : 'Target';
+  if (ui.nextColorSwatchEl) ui.nextColorSwatchEl.title = nextColor ? `Exposed: ${nextColor}` : 'Exposed';
   if (ui.nextColorNameEl) ui.nextColorNameEl.textContent = nextColor ? String(nextColor).toUpperCase() : '';
+
+  // In-game meters (bigger + more obvious, but still compact)
+  if (ui.igTargetWidgetEl) {
+    const accent = colorNameToAccent(nextColor);
+    ui.igTargetWidgetEl.style.setProperty('--accent', accent);
+    ui.igTargetWidgetEl.style.setProperty('--accentGlow', colorNameToAccentGlow(nextColor));
+
+    ui.igTargetWidgetEl.title = nextColor ? `CONSOLE SCAN: ${String(nextColor).toUpperCase()} is EXPOSED` : 'CONSOLE SCAN';
+
+    // Pulse when target color changes.
+    if (nextColor !== lastUiNextColor) {
+      lastUiNextColor = nextColor;
+      if (ui.igTargetWordEl) {
+        ui.igTargetWordEl.classList.remove('igPulse');
+        // Force reflow to restart animation.
+        void ui.igTargetWordEl.offsetWidth;
+        ui.igTargetWordEl.classList.add('igPulse');
+      }
+    }
+  }
+
+  if (ui.igEnergyWidgetEl) {
+    const ep = clampPercent(energyPercent);
+    ui.igEnergyWidgetEl.style.setProperty('--p', String(ep / 100));
+    ui.igEnergyWidgetEl.style.setProperty('--accent', energyAccent(ep));
+    ui.igEnergyWidgetEl.style.setProperty('--accentGlow', energyAccentGlow(ep));
+    if (ui.igEnergyPctEl) ui.igEnergyPctEl.textContent = `${ep}%`;
+  }
+
+  // If we render the nicer target preview in-game, mirror it into the top bar swatch.
+  syncTargetSwatches(ui);
 
   renderLives(ui.livesContainerEl, lives);
 
@@ -203,6 +239,61 @@ export function updateHud(ui, state) {
     laserCooldownSeconds: Number(laserCooldownSeconds) || 0,
     nukeCooldownSeconds: Number(nukeCooldownSeconds) || 0,
   });
+}
+
+let lastUiNextColor = null;
+
+function colorNameToAccent(name) {
+  const k = typeof name === 'string' ? name.toLowerCase() : '';
+  if (k === 'yellow') return '#ffd54a';
+  if (k === 'red') return '#ff4d6d';
+  if (k === 'green') return '#5dff7b';
+  if (k === 'blue') return '#49b6ff';
+  if (k === 'black') return '#e6f2ff';
+  if (k === 'white') return '#ffffff';
+  if (k === 'purple') return '#b56cff';
+  if (k === 'brown') return '#c48b5a';
+  if (k === 'pink') return '#ff6bd6';
+  return '#66ccff';
+}
+
+function colorNameToAccentGlow(name) {
+  const hex = colorNameToAccent(name);
+  return hexToRgba(hex, 0.28);
+}
+
+function energyAccent(ep) {
+  // Slightly game-y: cyan when healthy, warning red when low.
+  if (ep > 55) return '#66ccff';
+  if (ep > 25) return '#ffd54a';
+  if (ep > 10) return '#ff7a4d';
+  return '#ff3b5f';
+}
+
+function energyAccentGlow(ep) {
+  return hexToRgba(energyAccent(ep), 0.22);
+}
+
+function hexToRgba(hex, alpha) {
+  if (typeof hex !== 'string') return `rgba(102, 204, 255, ${alpha})`;
+  const h = hex.trim().replace('#', '');
+  if (h.length !== 6) return `rgba(102, 204, 255, ${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return `rgba(102, 204, 255, ${alpha})`;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function syncTargetSwatches(ui) {
+  const src = ui.igTargetSwatchEl;
+  const dst = ui.nextColorSwatchEl;
+  if (!src || !dst || src === dst) return;
+  const dctx = dst.getContext('2d');
+  if (!dctx) return;
+  dctx.clearRect(0, 0, dst.width, dst.height);
+  dctx.imageSmoothingEnabled = true;
+  dctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, dst.width, dst.height);
 }
 
 function clampPercent(v) {
@@ -384,11 +475,23 @@ export function hideGameOver(ui) {
 }
 
 export function openModal(modal) {
-  modal?.classList.remove('hidden');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  try {
+    modal.setAttribute('aria-hidden', 'false');
+  } catch {
+    // ignore
+  }
 }
 
 export function closeModal(modal) {
-  modal?.classList.add('hidden');
+  if (!modal) return;
+  modal.classList.add('hidden');
+  try {
+    modal.setAttribute('aria-hidden', 'true');
+  } catch {
+    // ignore
+  }
 }
 
 function getTrophyNextCost(basePrice, nextLevel) {

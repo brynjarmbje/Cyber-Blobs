@@ -2,6 +2,19 @@
 
 Top-down neon survival game. Survive and shoot the **NEXT** enemy.
 
+## Project structure
+
+- `index.html`: minimal app shell
+- `views/`: HTML partials (main menu, game shell, modals)
+- `src/`: ES module source code
+   - `src/app/`: boot + main entry
+   - `src/game/`: game loop, map, enemies, renderer glue
+   - `src/ui/`: menus + HUD UI helpers
+   - `src/platform/`: storage, audio, PWA
+   - `src/shared/`: constants
+- `sw.js`: service worker (offline caching)
+- `style*.css`: modular stylesheets
+
 ## Run locally
 
 ```bash
