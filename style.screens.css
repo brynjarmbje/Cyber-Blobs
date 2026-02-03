@@ -183,7 +183,6 @@
       display:block;
       touch-action: none;
       background: transparent;
-      border: 2px solid rgba(255,255,255,0.12);
       box-shadow: 0 18px 70px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.08) inset;
       border-radius: 20px;
     }
@@ -426,6 +425,7 @@
     pointer-events: none;
     z-index: 30;
     --touchZoneTop: clamp(140px, 28vw, 240px);
+    touch-action: none;
   }
   .touchZone {
     position: absolute;
@@ -433,6 +433,7 @@
     bottom: 0;
     width: 50%;
     pointer-events: auto;
+    touch-action: none;
   }
   .touchZone--left { left: 0; }
   .touchZone--right { right: 0; }
@@ -628,19 +629,32 @@
     transform: translate(-50%, -50%);
   }
 
-  /* Image-based touch controls */
+  /* Neon touch controls (no images) */
   #moveStick.joystick,
   #aimStick.joystick {
-    background-color: transparent;
-    border: none;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.35);
-    backdrop-filter: none;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: contain;
+    background:
+      radial-gradient(circle at 30% 30%, rgba(255,255,255,0.18), rgba(255,255,255,0.06) 38%, rgba(0,0,0,0) 70%),
+      radial-gradient(circle at 70% 70%, rgba(0,255,255,0.12), rgba(0,0,0,0) 65%),
+      rgba(0,0,0,0.18);
+    border: 1px solid rgba(0,255,255,0.28);
+    box-shadow:
+      0 14px 28px rgba(0,0,0,0.30),
+      0 0 18px rgba(0,255,255,0.18),
+      0 0 0 1px rgba(255,255,255,0.10) inset,
+      0 0 0 1px rgba(0,0,0,0.45) inset;
+    backdrop-filter: blur(8px);
   }
-  #moveStick.joystick { background-image: url('assets/left_analog_cyber.png'); }
-  #aimStick.joystick { background-image: url('assets/right_analog_cyber.png'); }
+  #moveStick.joystick::before,
+  #aimStick.joystick::before {
+    content: '';
+    position: absolute;
+    inset: 12%;
+    border-radius: 999px;
+    border: 1px dashed rgba(0,255,255,0.18);
+    box-shadow: 0 0 10px rgba(0,255,255,0.15) inset;
+    opacity: 0.8;
+    pointer-events: none;
+  }
 
   /* Keep the moving knob as a small, high-contrast puck */
   #moveStick.joystick .knob,
@@ -1265,6 +1279,14 @@
   .trophyCard button:disabled { opacity:.4; cursor:not-allowed; }
   .ownedTag { position:absolute; top:6px; right:6px; background:#0ff; color:#000; font-size:10px; padding:2px 6px; border-radius:6px; font-weight:700; }
   @media (max-width: 900px){
+    html, body {
+      height: 100%;
+    }
+    #app {
+      height: calc(var(--vh, 1vh) * 100);
+      min-height: calc(var(--vh, 1vh) * 100);
+      overflow: hidden;
+    }
     /* Fullscreen game on tablet/phone: top bar overlays instead of taking layout height. */
     #topBar {
       position: absolute;
@@ -1289,21 +1311,28 @@
     #desktopControlsHint { display:none; }
     #touchControls {
       display:flex;
-      position: absolute;
+      position: fixed;
       left: 0;
       right: 0;
-      bottom: 0;
+      bottom: env(safe-area-inset-bottom);
       padding: 16px;
-      padding-bottom: calc(16px + env(safe-area-inset-bottom));
+      padding-bottom: 16px;
     }
     #touchZones { display: block; }
     #ultButtons { display:none; }
 
     /* Game fills the whole viewport; touch controls overlay at the bottom. */
-    #gameArea { padding: 0; place-items: stretch; align-items: stretch; height: 100dvh; }
+    #gameArea {
+      padding: 0;
+      place-items: stretch;
+      align-items: stretch;
+      height: 100%;
+      min-height: 0;
+    }
     #gameShell {
       width: 100vw;
-      height: 100dvh;
+      height: 100%;
+      min-height: 0;
       aspect-ratio: auto;
     }
     #gameCanvas { border-radius: 0; }
@@ -1327,7 +1356,10 @@
     #touchUltStack .ultBtn .ultMain { font-size: 11px; }
     #touchUltStack .ultBtn .ultKey { font-size: 9px; }
 
-    #gameShell { height: 100dvh; }
+    #gameShell {
+      height: 100%;
+      min-height: 0;
+    }
 
     #activeOverlay { font-size: 14px; }
 

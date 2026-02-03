@@ -838,10 +838,17 @@ export function createGame(ui) {
   let bullets = [];
   // Renderer uses fixed-size instanced meshes for bullets; keep gameplay bullets within that limit.
   const MAX_BULLETS = 256;
+  const MAX_PARTICLES = 320;
   let bulletSpeed = 5;
   let bulletRadius = 3;
   let bulletHitRadius = bulletRadius * 1.35;
   let particles = [];
+
+  function pushParticle(p) {
+    if (particles.length >= MAX_PARTICLES) return false;
+    particles.push(p);
+    return true;
+  }
 
   function ensureBulletCapacity(addCount = 1) {
     const want = bullets.length + Math.max(0, Math.floor(addCount));
@@ -1837,7 +1844,7 @@ export function createGame(ui) {
 
   function spawnCircleBurst(x, y, color, minR, maxR) {
     for (let i = 0; i < 8; i++) {
-      particles.push({
+      if (!pushParticle({
         x,
         y,
         vx: (Math.random() - 0.5) * 2,
@@ -1846,13 +1853,13 @@ export function createGame(ui) {
         maxLife: 1,
         radius: minR + Math.random() * (maxR - minR),
         color,
-      });
+      })) break;
     }
   }
 
   function spawnEnemyDeathParticles(x, y, color) {
     for (let i = 0; i < 18; i++) {
-      particles.push({
+      if (!pushParticle({
         x,
         y,
         vx: (Math.random() - 0.5) * 3,
@@ -1861,13 +1868,13 @@ export function createGame(ui) {
         maxLife: 1,
         radius: 10 + Math.random() * 4,
         color,
-      });
+      })) break;
     }
   }
 
   function spawnMuzzle(x, y) {
     for (let i = 0; i < 4; i++) {
-      particles.push({
+      if (!pushParticle({
         x,
         y,
         vx: (Math.random() - 0.5) * 1.5,
@@ -1876,7 +1883,7 @@ export function createGame(ui) {
         maxLife: 1,
         radius: 3 + Math.random() * 2,
         color: 'rgba(0,0,0,0.6)',
-      });
+      })) break;
     }
   }
 
@@ -2887,7 +2894,9 @@ export function createGame(ui) {
       e.prevX = e.x;
       e.prevY = e.y;
 
-      updateEnemyBlob(e, nowMs);
+      // If 3D renderer is active, the blob wobble is handled in shaders.
+      // Skip the 2D blob update to save CPU at higher enemy counts.
+      if (!renderer3d) updateEnemyBlob(e, nowMs);
     }
 
     // Separate enemies is O(n^2). Throttle slightly when the screen is crowded.
@@ -3251,13 +3260,33 @@ export function createGame(ui) {
 
     const updateFromEvent = (e) => {
       const rect = stickEl.getBoundingClientRect();
-      const cx = center ? center.x : rect.left + rect.width / 2;
-      const cy = center ? center.y : rect.top + rect.height / 2;
-      const dx = e.clientX - cx;
-      const dy = e.clientY - cy;
+      let cx = center ? center.x : rect.left + rect.width / 2;
+      let cy = center ? center.y : rect.top + rect.height / 2;
+      let dx = e.clientX - cx;
+      let dy = e.clientY - cy;
       const r = rect.width / 2;
       const max = r * 0.55;
-      const mag = Math.hypot(dx, dy) || 1;
+      let mag = Math.hypot(dx, dy) || 1;
+
+      // Dynamic center: let the center follow the finger so the player
+      // can keep sliding without re-grabbing from the original touch point.
+      if (center && mag > max) {
+        const ux = dx / mag;
+        const uy = dy / mag;
+        const buffer = max * 0.12;
+        const excess = mag - max;
+        if (excess > buffer) {
+          const shift = (excess - buffer) * 0.6;
+          cx += ux * shift;
+          cy += uy * shift;
+          center.x = cx;
+          center.y = cy;
+          dx = e.clientX - cx;
+          dy = e.clientY - cy;
+          mag = Math.hypot(dx, dy) || 1;
+        }
+      }
+
       const clamped = Math.min(max, mag);
       const ux = (dx / mag) * clamped;
       const uy = (dy / mag) * clamped;
@@ -3285,17 +3314,10 @@ export function createGame(ui) {
 
       if (zoneEl) {
         const zoneRect = zoneEl.getBoundingClientRect();
-        const parentRect = stickEl.parentElement?.getBoundingClientRect();
         const r = stickEl.clientWidth / 2;
         const cx = clamp(e.clientX, zoneRect.left + r, zoneRect.right - r);
         const cy = clamp(e.clientY, zoneRect.top + r, zoneRect.bottom - r);
         center = { x: cx, y: cy };
-
-        if (parentRect) {
-          stickEl.classList.add('isFloating');
-          stickEl.style.left = `${cx - r - parentRect.left}px`;
-          stickEl.style.top = `${cy - r - parentRect.top}px`;
-        }
       }
 
       updateFromEvent(e);
@@ -3402,6 +3424,14 @@ export function createGame(ui) {
     resizeCanvasToCssSize();
     window.addEventListener('resize', resizeCanvasToCssSize);
 
+    // Mobile viewport height fix (browser UI bars can shrink visible area).
+    const setViewportVh = () => {
+      const h = (globalThis.visualViewport?.height || window.innerHeight || 0) * 0.01;
+      if (h > 0) document.documentElement.style.setProperty('--vh', `${h}px`);
+    };
+    setViewportVh();
+    window.addEventListener('resize', setViewportVh, { passive: true });
+
     // Mobile browsers (especially iOS Safari) can change the visual viewport
     // (URL bar collapse/expand, keyboard) without reliably emitting window resize.
     // Keep canvas size + input rect in sync.
@@ -3412,6 +3442,8 @@ export function createGame(ui) {
         resizeCanvasToCssSize();
         refreshCanvasRect();
       }, { passive: true });
+      vv.addEventListener('resize', setViewportVh, { passive: true });
+      vv.addEventListener('scroll', setViewportVh, { passive: true });
     }
 
     // Touch controls
