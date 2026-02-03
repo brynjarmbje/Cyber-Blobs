@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.bmb.cyberyolks",
+      "sha256_cert_fingerprints": [
+        "DF:C7:4F:47:E9:1A:ED:27:D8:99:38:E3:DB:23:16:7F:79:18:4A:03:58:DA:F0:63:68:59:DC:78:E8:A2:73:A8"
+      ]
+    }
+  }
+]

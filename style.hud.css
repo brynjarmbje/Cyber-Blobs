@@ -1,674 +1,1310 @@
     /* ---------- Shooter HUD (COCKPIT FRAME) ---------- */
     /* Inspired by the provided concept image: cockpit frame + top readouts.
        Still performance-friendly: gradients + borders only, no heavy blur stacks. */
-    /* --- Remastered HUD layout (liquid cockpit) --- */
-    #igHud.igHud--cockpit.igHud--liquid {
-      --hudFont: "Rajdhani", "Orbitron", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-      --hudLabelTrack: 0.2em;
-      --hudValueTrack: 0.06em;
-      --hudLabelSize: clamp(9px, 1.1vw, 10px);
-      --hudValueSize: clamp(18px, 2.4vw, 22px);
-      --hudGap: clamp(8px, 1.4vw, 14px);
-      --hudPadX: clamp(10px, 2.2vw, 18px);
-      --hudPadY: clamp(10px, 2.2vw, 18px);
-      --hudTapHeight: clamp(140px, 28vw, 240px);
-      --hudPillH: clamp(56px, 7vw, 72px);
+    #igHud.igHud--cockpit {
+      --cockpitRadius: 20px;
+      --uiText: rgba(234,255,255,0.95);
+      --uiMuted: rgba(200, 230, 255, 0.72);
+      --uiStroke: rgba(255,255,255,0.14);
+      --uiInk: rgba(0,0,0,0.62);
+
+      /* Lives frame (can be swapped when you add the new asset) */
+      --livesFrameImage: url('assets/lives_cyber.png');
+
+      /* lives_cyber.png is 1536x1024 */
+      --livesFrameAspect: 3 / 2;
+
+      /* Frame assets: tune these vars to fit the transparent “windows” perfectly */
+      --frameLevelW: clamp(84px, 9vw, 130px);
+      --frameLevelAspect: 275 / 241;
+      --frameLevelH: calc(var(--frameLevelW) * (241 / 275));
+      --levelFrameScale: contain;
+      --levelLabelSize: clamp(9px, calc(var(--frameLevelH) * 0.28), 12px);
+      --levelValueSize: clamp(17px, calc(var(--frameLevelH) * 0.62), 25px);
+      --frameCashW: clamp(128px, 22vw, 165px);
+      --frameCashAspect: 1332 / 396;
+      --frameCashH: calc(var(--frameCashW) * (396 / 1332));
+      --frameEnergyW: clamp(86px, 16vw, 120px);
+      --frameEnergyH: clamp(210px, 36vw, 290px);
+      /* Lives frame sizing (tune as needed) */
+      --frameLivesW: clamp(200px, 32vw, 260px);
+      --frameLivesH: calc(var(--frameLivesW) * 0.46);
+      /* Footprint scaling (use smaller containers without shrinking the art) */
+      --livesFrameScale: 100%;
+      --igTargetFootprintSize: var(--igTargetSize);
+
+      /* Top HUD layout (keeps each frame as a solid object) */
+      --hudPadX: 14px;
+      --hudPadY: 14px;
+      --hudGapY: 8px;
+      --hudGapX: 12px;
+      --hudLeftGapY: 18px;
+      --hudFlowInsetX: 10px;
+      --hudFlowInsetY: 8px;
+      --hudFlowHeight: clamp(240px, 30vw, 320px);
+      --hudFlowTop: calc(var(--hudFlowInsetY) + env(safe-area-inset-top));
+
+      /* Typography for HUD labels/values */
+      --hudLabelSize: 9px;
+      --hudValueSize: 12px;
+      /* Pause frame sizing (pause_button_cyber.png is 1536x1024 => 3/2) */
+      --pauseBtnAspect: 3 / 2;
+      --pauseBtnW: clamp(104px, 22vw, 168px);
+      --pauseBtnH: calc(var(--pauseBtnW) * 2 / 3);
+      --hudPauseH: var(--pauseBtnH);
+      --hudPauseW: var(--pauseBtnW);
+
+      /* Crop/zoom the pause PNG to remove any outer halo/padding */
+      --pauseImgZoom: 1.22;
+
+      /* Fine nudges (keep HUD objects solid; only move the whole object) */
+      --livesTopNudgeY: 0px;
+      --igTargetTopNudge: 0px;
+
+      /* Frame background-position tuning (helps if PNGs have transparent padding) */
+      --livesFrameBgPosY: 50%;
+      --energyFrameBgPosY: 50%;
+      --targetFrameBgPosY: 50%;
+
+      /* Lives number “window” inside the frame (use % so it scales cleanly) */
+      --livesWindowCx: 64%;
+      --livesWindowCy: 54%;
+      --livesWindowW: 20%;
+      --livesWindowH: 54%;
+      --livesWindowFontSize: 20px;
+      --livesWindowNudgeX: 10px;
+      --livesWindowNudgeY: -11px;
+
+      --frameShadow: 0 18px 36px rgba(0,0,0,0.45);
+
+      /* Inner window offsets (used for the energy fill + lives counter) */
+      /* Increase these to shorten the fill inside the frame */
+      /* Shift the fill window UP without changing its height:
+        increase bottom inset, decrease top inset by same amount */
+      --energyInsetTop: 50px;
+      /* Reduce fill height (take space from bottom) */
+      --energyInsetBottom: 70px;
+      /* Wider + shifted 2px left (smaller left inset than right) */
+      --energyInsetLeft: 18px;
+      --energyInsetRight: 22px;
+
+      --livesInsetX: 22px;
+      --livesInsetY: 18px;
+
+      /* Target frame sizing ("way bigger" on desktop, still responsive) */
+      --igTargetSize: clamp(160px, 30vw, 280px);
+      --igTargetAspect: 1092 / 656;
+      --igTargetW: var(--igTargetSize);
+      --igTargetH: calc(var(--igTargetW) * (656 / 1092));
+      --igTargetFootprintW: var(--igTargetW);
+      --igTargetFootprintH: var(--igTargetH);
+      --igTargetPad: 0px;
+      /* IMPORTANT: swatch (the actual target/yolk) stays fixed; only the frame scales */
+      --igTargetSwatchSize: clamp(44px, 9vw, 68px);
+      --igTargetSwatchOffsetX: 2px;
+      --igTargetSwatchOffsetY: -40px;
+      --igTargetTopAdjust: -26px;
+
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      width: 100%;
-      height: auto;
-      box-sizing: border-box;
-      display: grid;
-      grid-template-areas: "left right";
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      align-items: start;
-      gap: var(--hudGap);
-      padding:
-        calc(var(--hudPadY) + env(safe-area-inset-top))
-        calc(var(--hudPadX) + env(safe-area-inset-right))
-        0
-        calc(var(--hudPadX) + env(safe-area-inset-left));
-      overflow: hidden;
+      inset: 0;
+      z-index: 38;
+      pointer-events: none;
+      user-select: none;
+    }
+
+    
+
+    /* In cockpit HUD mode, we don't need the external header. */
+    #app.app--cockpit #topBar { display: none; }
+
+    /* Frame overlay */
+    #igHud.igHud--cockpit::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--cockpitRadius);
+      background:
+        radial-gradient(1200px 680px at 50% 0%, rgba(0,255,255,0.08), rgba(0,0,0,0) 55%),
+        radial-gradient(900px 620px at 90% 10%, rgba(255, 120, 0, 0.08), rgba(0,0,0,0) 60%),
+        radial-gradient(900px 620px at 10% 10%, rgba(255, 80, 200, 0.06), rgba(0,0,0,0) 60%);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.08) inset,
+        0 0 0 2px rgba(0,0,0,0.55) inset;
+      pointer-events: none;
+    }
+    #igHud.igHud--cockpit::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: var(--cockpitRadius);
+      background:
+        linear-gradient(180deg, rgba(0,0,0,0.10), rgba(0,0,0,0.00) 40%),
+        linear-gradient(0deg, rgba(0,0,0,0.18), rgba(0,0,0,0.00) 45%);
       pointer-events: none;
     }
 
-    #igHud.igHud--cockpit.igHud--liquid .igHudPanel {
-      display: flex !important;
-      flex-direction: column;
-      gap: var(--hudGap);
-      min-width: 0;
+    /* Decorative flowy HUD frame tying top elements together */
+    #igHud.igHud--cockpit .igHudFrameFlow {
+      position: absolute;
+      left: calc(var(--hudFlowInsetX) + env(safe-area-inset-left));
+      right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right));
+      top: calc(var(--hudFlowInsetY) + env(safe-area-inset-top));
+      height: var(--hudFlowHeight);
+      border-radius: 26px;
+      border: 1px solid rgba(140, 220, 255, 0.22);
+      background:
+        radial-gradient(120% 140% at 10% 0%, rgba(0, 255, 255, 0.08), rgba(0,0,0,0) 55%),
+        radial-gradient(120% 160% at 90% 10%, rgba(255, 140, 60, 0.10), rgba(0,0,0,0) 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.05), rgba(0,0,0,0.00) 55%),
+        rgba(0,0,0,0.12);
+      box-shadow:
+        0 18px 40px rgba(0,0,0,0.28),
+        inset 0 0 0 1px rgba(255,255,255,0.06);
       pointer-events: none;
+      z-index: 1;
     }
-    #igHud.igHud--cockpit.igHud--liquid .igHudPanel--left { grid-area: right; align-items: flex-end; }
-    #igHud.igHud--cockpit.igHud--liquid .igHudPanel--right { grid-area: left; align-items: flex-start; }
-    #igHud.igHud--cockpit.igHud--liquid .igHudPanel--center { display: none !important; }
-    #igHud.igHud--cockpit.igHud--liquid .igHudPanel--center { display: none !important; }
-    #igHud.igHud--cockpit.igHud--liquid .igHudRightStack,
-    #igHud.igHud--cockpit.igHud--liquid .igHudRightMeta {
-      display: flex !important;
-      flex-direction: column;
-      gap: var(--hudGap);
-      min-width: 0;
-      pointer-events: none;
+
+    /* Treat panels as layout-free wrappers in cockpit mode */
+    #igHud.igHud--cockpit .igHudPanel,
+    #igHud.igHud--cockpit .igHudRightStack,
+    #igHud.igHud--cockpit .igHudRightMeta {
+      display: contents;
     }
-    #igHud.igHud--cockpit.igHud--liquid #activeOverlay {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      align-items: center;
-      justify-content: flex-start;
-      pointer-events: none;
+
+     /* --- HUD debug boxes (toggle) ---
+       Add `hudDebugBoxes` to #app in views/app.html to visualize DOM element boxes.
+       Note: if an asset PNG has transparent padding, the visible frame may look smaller
+       than this outline — that’s expected.
+       Example: <div id="app" class="app--cockpit hudDebugBoxes">…
+     */
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit .igStat--level,
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit .igStat--cash,
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit,
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #igEnergy,
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #livesOverlay.igLives,
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+      /* IMPORTANT: use inset box-shadow (not outline) so it stays clipped to the canvas */
+      box-shadow: 0 0 0 2px rgba(0, 255, 255, 0.70) inset;
+      background-color: transparent;
     }
-    #igHud.igHud--cockpit.igHud--liquid .igPowerPill {
-      --accent: #66ccff;
-      --accentGlow: rgba(102, 204, 255, 0.35);
-      height: var(--hudPowerPillH, 36px);
-      min-width: 70px;
-      padding: 5px 8px;
-      border-radius: 10px;
-      background: linear-gradient(180deg, rgba(102, 204, 255, 0.16), rgba(0,0,0,0.28));
-      border: 1px solid color-mix(in srgb, var(--accent) 70%, rgba(255,255,255,0.2));
-      box-shadow: 0 10px 22px rgba(0,0,0,0.32), 0 0 16px var(--accentGlow);
+
+    /* Give a slightly different tint to help distinguish left/right/top objects */
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit {
+      box-shadow: 0 0 0 2px rgba(255, 170, 40, 0.75) inset;
+      background-color: transparent;
+    }
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #livesOverlay.igLives {
+      box-shadow: 0 0 0 2px rgba(255, 77, 109, 0.75) inset;
+      background-color: transparent;
+    }
+    #app.app--cockpit.hudDebugBoxes #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+      box-shadow: 0 0 0 2px rgba(190, 255, 120, 0.75) inset;
+      background-color: transparent;
+    }
+
+    /* Top-left: LVL hex badge */
+    #igHud.igHud--cockpit .igStat--level {
+      position: absolute;
+      left: calc(var(--hudPadX) + env(safe-area-inset-left));
+      top: calc(var(--hudPadY) + env(safe-area-inset-top));
+      width: var(--frameLevelW);
+      height: var(--frameLevelH);
+      padding: 0;
+      border: none;
+      background:
+        radial-gradient(120% 160% at 20% 10%, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(40, 120, 255, 0.18), rgba(0,0,0,0.12));
+      filter: drop-shadow(var(--frameShadow));
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.18);
+      clip-path: none;
       display: grid;
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-      align-content: stretch;
-      row-gap: 2px;
+      place-items: center;
+      position: absolute;
+    }
+    #igHud.igHud--cockpit .igStat--level::before { content: none; }
+    #igHud.igHud--cockpit .igStat--level .igLabel {
+      position: absolute;
+      left: calc(50% + 3px);
+      top: 30%;
+      transform: translate(-50%, -50%);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: var(--levelLabelSize);
+      letter-spacing: 0.16em;
+      color: rgba(255, 235, 210, 0.92);
+      margin: 0;
+    }
+    #igHud.igHud--cockpit .igStat--level .igValue {
+      position: absolute;
+      left: calc(50% + 3px);
+      top: 60%;
+      transform: translate(-50%, -50%);
+      font-weight: 1000;
+      font-size: var(--levelValueSize);
+      letter-spacing: 0.02em;
+      color: rgba(255, 244, 225, 0.98);
+      text-shadow: 0 0 20px rgba(255, 170, 40, 0.25), 0 2px 0 rgba(0,0,0,0.55);
+      line-height: 1;
+    }
+
+    /* Pause button lives in HUD (top-right) */
+    #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit {
+      position: absolute;
+      right: calc(var(--hudPadX) + env(safe-area-inset-right));
+      top: calc(var(--hudPadY) + env(safe-area-inset-top));
+      width: var(--pauseBtnW);
+      height: var(--pauseBtnH);
+      aspect-ratio: var(--pauseBtnAspect);
+      min-width: 0;
+      padding: 0;
+      border: none;
+      border-radius: 0;
+      background: none;
+      background-color: transparent;
+      box-shadow: none;
+      border: none;
+      border-radius: 0;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      overflow: hidden;
+      color: transparent;
+      text-shadow: none;
+      font-size: 0;
+      line-height: 0;
+      pointer-events: auto;
+    }
+
+    /* Draw the pause PNG on a pseudo-element and zoom-crop it.
+       This removes blurry/transparent halo padding in the source image without shrinking the button. */
+    #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit::before {
+      content: none;
+    }
+
+    /* Top-right: cash badge (similar to level, smaller, below PAUSE) */
+    #igHud.igHud--cockpit .igStat--cash {
+      position: absolute;
+      right: calc(var(--hudPadX) + env(safe-area-inset-right));
+      top: calc(var(--hudPadY) + env(safe-area-inset-top) + var(--hudPauseH) + var(--hudGapY));
+      width: var(--frameCashW);
+      height: var(--frameCashH);
+      padding: 0;
+      display: grid;
+      place-items: center;
+      gap: 0;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background:
+        radial-gradient(120% 160% at 18% 10%, rgba(255,255,255,0.22), rgba(255,255,255,0.08) 45%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(0, 255, 200, 0.12), rgba(0,0,0,0.12));
+      filter: drop-shadow(var(--frameShadow));
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+      clip-path: none;
+    }
+    #igHud.igHud--cockpit .igStat--cash::before { content: none; }
+    #igHud.igHud--cockpit .igStat--cash .igLabel {
+      position: absolute;
+      left: 50%;
+      top: 28%;
+      transform: translate(-50%, -50%);
+      display: block;
+      margin: 0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 900;
+      font-size: var(--hudLabelSize);
+      letter-spacing: 0.14em;
+      color: rgba(200, 235, 255, 0.85);
+    }
+    #igHud.igHud--cockpit .igStat--cash .igValue {
+      position: absolute;
+      left: 50%;
+      top: 64%;
+      transform: translate(-50%, -50%) translate(2px, 0px);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 1000;
+      font-size: var(--hudValueSize);
+      letter-spacing: 0.04em;
+      color: rgba(200, 255, 255, 0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.55);
+    }
+
+    /* Top-center: target orb + label */
+    #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+      position: absolute;
+      left: 50%;
+      top: calc(env(safe-area-inset-top) + 8px + var(--igTargetTopAdjust, 0px) + var(--igTargetTopNudge, 0px));
+      transform: translateX(-50%);
+      display: grid;
+      place-items: center;
+      gap: 8px;
+      padding: var(--igTargetPad);
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      min-width: 0;
+      width: var(--igTargetFootprintW, var(--igTargetFootprintSize));
+      height: var(--igTargetFootprintH, var(--igTargetFootprintSize));
+      box-sizing: content-box;
+      overflow: visible;
+    }
+
+    #igHud.igHud--cockpit .igTargetOrb {
+      width: var(--igTargetW, var(--igTargetSize));
+      height: var(--igTargetH, var(--igTargetSize));
+      display: grid;
+      place-items: center;
+      position: relative;
+    }
+
+    #igHud.igHud--cockpit .igTargetRing {
+      width: var(--igTargetW, var(--igTargetSize));
+      height: var(--igTargetH, var(--igTargetSize));
+      border-radius: 20px;
+      position: relative;
+      background: none;
+      border: none;
+      box-shadow: none;
+      display: grid;
+      place-items: center;
+    }
+
+    /* Target frame asset (has transparent center) */
+    #igHud.igHud--cockpit .igTargetRing::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 20px;
+      background:
+        radial-gradient(120% 160% at 20% 10%, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(120, 255, 200, 0.10), rgba(0,0,0,0.16));
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 18px 36px rgba(0,0,0,0.25);
+      z-index: 3;
       pointer-events: none;
     }
-    #igHud.igHud--cockpit.igHud--liquid .igPowerPillLabel {
-      font-size: 9px;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      font-family: var(--hudFont);
-      color: color-mix(in srgb, var(--accent) 75%, #e9f5ff 25%);
-      text-shadow: 0 0 10px var(--accentGlow);
-      justify-self: start;
-      align-self: start;
+
+    #igHud.igHud--cockpit #igTargetSwatch.igSwatch {
+      position: relative;
+      z-index: 1;
+      width: var(--igTargetSwatchSize);
+      height: var(--igTargetSwatchSize);
+      border-radius: 999px;
+      border: none;
+      background: rgba(0,0,0,0.25);
+      box-shadow: none;
+      transform: translate(var(--igTargetSwatchOffsetX, 0px), var(--igTargetSwatchOffsetY, 0px));
     }
-    #igHud.igHud--cockpit.igHud--liquid .igPowerPillValue {
-      font-size: 13px;
+
+    /* Target label uses the existing #nextColorName value */
+    #igHud.igHud--cockpit .igTargetText--cockpit {
+      display: grid;
+      justify-items: center;
+      gap: 0;
+      padding: 6px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(0,0,0,0.18);
+      box-shadow: 0 10px 20px rgba(0,0,0,0.30);
+    }
+    #igHud.igHud--cockpit #igTargetWord { display: block; }
+    #igHud.igHud--cockpit #nextColorName {
+      font-weight: 1000;
+      font-size: 18px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(160, 255, 255, 0.96);
+      text-shadow: 0 0 18px rgba(0,255,255,0.14), 0 2px 0 rgba(0,0,0,0.55);
+    }
+
+    /* Left: vertical energy tube */
+    #igHud.igHud--cockpit #igEnergy {
+      position: absolute;
+      left: calc(var(--hudPadX) + env(safe-area-inset-left));
+      top: calc(var(--hudPadY) + env(safe-area-inset-top) + var(--frameLevelH) + var(--hudLeftGapY));
+      display: grid;
+      justify-items: start;
+      gap: 8px;
+    }
+    #igHud.igHud--cockpit .igEnergyLabel {
+      display: block;
+      font-size: var(--hudLabelSize);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(200, 235, 255, 0.80);
+      margin-left: 6px;
+    }
+    #igHud.igHud--cockpit .igEnergyBar {
+      width: var(--frameEnergyW);
+      height: var(--frameEnergyH);
+      border-radius: 18px;
+      background:
+        radial-gradient(120% 160% at 18% 10%, rgba(255,255,255,0.20), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 70%),
+        rgba(0,0,0,0.20);
+      border: 1px solid rgba(255,255,255,0.16);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+      overflow: visible;
+      position: relative;
+    }
+    #igHud.igHud--cockpit .igEnergyBar::before {
+      content: none;
+    }
+    #igHud.igHud--cockpit .igEnergyFill {
+      position: absolute;
+      /* Override the generic horizontal `.igEnergyFill` rules (which set `top: 0`). */
+      top: auto;
+      left: var(--energyInsetLeft);
+      right: var(--energyInsetRight);
+      bottom: var(--energyInsetBottom);
+      height: calc(100% - var(--energyInsetTop) - var(--energyInsetBottom));
+      width: auto !important;
+      border-radius: 0;
+      transform-origin: center bottom;
+      transform: translate(-1px, 4px) scaleY(var(--p));
+      z-index: 2;
+      background:
+        repeating-linear-gradient(
+          0deg,
+          rgba(255,255,255,0.10) 0 7px,
+          rgba(255,255,255,0.02) 7px 12px
+        ),
+        linear-gradient(0deg, var(--accent), rgba(255,255,255,0.28));
+      box-shadow: 0 0 18px var(--accentGlow, rgba(102,204,255,0.20));
+    }
+    #igHud.igHud--cockpit .igEnergyCore { display: none; }
+    #igHud.igHud--cockpit .igEnergyBar .igEnergyPct {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      transform: rotate(-90deg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-weight: 950;
+      font-size: 12px;
       letter-spacing: 0.06em;
-      font-family: var(--hudFont);
-      font-weight: 800;
-      color: #f4fbff;
-      text-shadow: 0 0 12px var(--accentGlow), 0 2px 0 rgba(0,0,0,0.6);
-      justify-self: center;
-      align-self: end;
+      color: rgba(200,255,255,0.95);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    /* Right: rocket lives */
+    #igHud.igHud--cockpit #livesOverlay.igLives {
+      position: absolute;
+      right: calc(var(--hudPadX) + env(safe-area-inset-right));
+      top: calc(
+        var(--hudPadY) + env(safe-area-inset-top)
+        + var(--hudPauseH) + var(--hudGapY)
+        + var(--frameCashH) + var(--hudGapY)
+      );
+      width: var(--frameLivesW);
+      height: var(--frameLivesH);
+      padding: 0;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background:
+        radial-gradient(120% 160% at 20% 10%, rgba(255,255,255,0.22), rgba(255,255,255,0.06) 45%, rgba(255,255,255,0) 70%),
+        linear-gradient(180deg, rgba(255, 80, 120, 0.12), rgba(0,0,0,0.14));
+      box-shadow: 0 12px 28px rgba(0,0,0,0.25);
+      filter: none;
+      display: block;
+    }
+
+    /* Label is baked into the lives frame image */
+    #igHud.igHud--cockpit #livesOverlay.igLives .igLabel {
+      display: block;
+      position: absolute;
+      left: 10px;
+      top: 8px;
+      font-size: var(--hudLabelSize);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(200, 235, 255, 0.82);
+    }
+
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer {
+      position: absolute;
+      left: var(--livesWindowCx);
+      top: var(--livesWindowCy);
+      width: var(--livesWindowW);
+      height: var(--livesWindowH);
+      transform:
+        translate(-50%, -50%)
+        translate(var(--livesWindowNudgeX), var(--livesWindowNudgeY));
+      display: grid;
+      place-items: center;
+      z-index: 1;
+    }
+
+    /* Lives are rendered as <span class="heart">…</span> — restyle as rockets in cockpit theme */
+    #igHud.igHud--cockpit #livesOverlay.igLives .heart {
+      /* Rocket icon is baked into the frame image; keep these spans only as a counter source */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      opacity: 0;
+    }
+    #igHud.igHud--cockpit #livesOverlay.igLives #livesContainer::before {
+      content: attr(data-lives-count);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      padding: var(--livesFramePad, 0px);
+      font-size: var(--livesWindowFontSize);
+      letter-spacing: 0.06em;
+      color: rgba(234,255,255,0.94);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.60);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Hide the active power-up overlay in cockpit mode (keeps things clean) */
+    #igHud.igHud--cockpit #topRightHud { display: none; }
+
+    /* Responsive: smaller HUD on narrow screens */
+    @media (max-width: 900px) {
+      #igHud.igHud--cockpit {
+        --cockpitRadius: 0px;
+        --igTargetSwatchOffsetX: 3px;
+        --igTargetSwatchOffsetY: -6px;
+        --igTargetTopAdjust: -18px;
+        --igTargetSize: 95px;
+        --igTargetFootprintSize: 95px;
+        --igTargetPad: 0px;
+      }
+
+      #igHud.igHud--cockpit .igTargetOrb,
+      #igHud.igHud--cockpit .igTargetRing {
+        width: 95px;
+        height: 95px;
+      }
+
+      #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+        width: 95px;
+        height: 95px;
+      }
+      #igHud.igHud--cockpit::before,
+      #igHud.igHud--cockpit::after {
+        border-radius: 0;
+      }
+      #igHud.igHud--cockpit {
+        /* Use clamp() so this layout holds up across many phone sizes */
+        --hudPadX: 10px;
+        --hudPadY: 10px;
+        --hudGapY: 8px;
+        --hudGapX: 10px;
+        --hudLeftGapY: 12px;
+        --hudPauseH: var(--pauseBtnH);
+        --hudPauseW: var(--pauseBtnW);
+
+        --frameLevelW: clamp(80px, 14vw, 110px);
+        --frameEnergyW: clamp(70px, 18vw, 96px);
+        --frameEnergyH: clamp(140px, 26vw, 180px);
+
+        --hudFlowInsetX: 6px;
+        --hudFlowInsetY: 6px;
+        --hudRowTop: clamp(58px, 14vw, 78px);
+        --hudRowMid: clamp(92px, 22vw, 126px);
+        --hudRowBottom: clamp(54px, 12vw, 72px);
+        --hudFlowHeight: calc(var(--hudRowTop) + var(--hudRowMid) + var(--hudRowBottom) + (var(--hudGapY) * 2));
+        --hudFlowTop: calc(var(--hudFlowInsetY) + env(safe-area-inset-top));
+        --levelFrameScale: 118%;
+
+        --pauseImgZoom: 1.22;
+
+        /* Smaller layout footprint without shrinking the visible art */
+        --frameLivesW: clamp(150px, 24vw, 200px);
+        --frameLivesH: clamp(70px, 12vw, 110px);
+        --livesFrameScale: 100%;
+        --livesFramePad: 2px;
+        --igTargetSize: clamp(200px, 36vw, 260px);
+        --igTargetFootprintSize: var(--igTargetSize);
+        --igTargetPad: 2px;
+
+        --frameCashW: clamp(90px, 16vw, 110px);
+
+        --livesWindowCx: 64%;
+        --livesWindowCy: 54%;
+        --livesWindowW: 22%;
+        --livesWindowH: 56%;
+        --livesWindowFontSize: 16px;
+        --livesWindowNudgeX: 6px;
+        --livesWindowNudgeY: -4px;
+
+        /* Keep the energy fill inside the smaller frame */
+        --energyInsetTop: 41px;
+        --energyInsetBottom: 61px;
+        --energyInsetLeft: 16px;
+        --energyInsetRight: 20px;
+
+        --hudLabelSize: 8px;
+        --hudValueSize: 11px;
+      }
+
+      #igHud.igHud--cockpit .igStat--cash .igValue { font-size: 10px; }
+
+      /* Mobile: responsive layout (stable across phones)
+         Requested order:
+         - TARGET: top middle
+         - LIVES: top left
+         - PAUSE: top right
+         - ENERGY: below lives (left)
+         - LEVEL: below lives, beside energy
+         - CASH: below pause
+
+         Target is positioned absolutely so its big frame doesn't push the grid down.
+      */
+      #igHud.igHud--cockpit {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-rows: var(--hudRowTop) var(--hudRowMid) var(--hudRowBottom);
+        gap: var(--hudGapY) var(--hudGapX);
+        align-content: start;
+        align-items: start;
+        justify-items: start;
+        padding:
+          calc(var(--hudPadY) + env(safe-area-inset-top))
+          calc(var(--hudPadX) + env(safe-area-inset-right))
+          var(--hudPadY)
+          calc(var(--hudPadX) + env(safe-area-inset-left));
+      }
+
+      /* Let the background overlays fill the padded grid area */
+      #igHud.igHud--cockpit::before,
+      #igHud.igHud--cockpit::after {
+        inset: 0;
+      }
+
+      /* Place items into grid; override absolute positioning for mobile */
+      #igHud.igHud--cockpit #livesOverlay.igLives {
+        grid-column: 2;
+        grid-row: 1;
+        position: relative;
+        inset: auto;
+        left: auto;
+        right: auto;
+        top: auto;
+        bottom: auto;
+        justify-self: center;
+        transform: translateY(-12px);
+        z-index: 6;
+      }
+
+      #igHud.igHud--cockpit #igEnergy {
+        grid-column: 1;
+        grid-row: 1;
+        position: relative;
+        inset: auto;
+        left: auto;
+        right: auto;
+        top: auto;
+        bottom: auto;
+        justify-self: start;
+        transform: translateY(-8px);
+        z-index: 6;
+      }
+
+      #igHud.igHud--cockpit .igStat--level {
+        grid-column: 3;
+        grid-row: 1;
+        position: relative;
+        inset: auto;
+        left: auto;
+        right: auto;
+        top: auto;
+        bottom: auto;
+        justify-self: end;
+        align-self: start;
+        transform: translate(-6px, 2px);
+        z-index: 6;
+      }
+
+      #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        height: auto;
+        width: auto;
+        z-index: 7;
+        background: transparent;
+        color: transparent;
+        pointer-events: auto;
+      }
+      #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit::before {
+        opacity: 0;
+      }
+
+      #igHud.igHud--cockpit .igStat--cash {
+        position: absolute;
+        right: calc(var(--hudPadX) + env(safe-area-inset-right));
+        top: calc(
+          var(--hudFlowTop)
+          + var(--hudRowTop) + var(--hudGapY)
+        );
+        transform: translate(-6px, 4px);
+        z-index: 6;
+      }
+
+      /* TARGET: centered below lives */
+      #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+        position: absolute;
+        left: 50%;
+        top: calc(
+          var(--hudFlowTop)
+          + var(--hudRowTop) + var(--hudGapY) + 4px
+        );
+        transform: translateX(-50%);
+        z-index: 6;
+        pointer-events: none;
+      }
+
+      #igHud.igHud--cockpit #nextColorName { font-size: 15px; }
     }
 
     @media (min-width: 901px) {
-      #igHud.igHud--cockpit.igHud--liquid {
-        grid-template-areas: "lives energy level cash";
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+      #igHud.igHud--cockpit {
+        /* Desktop sizing (override mobile-focused tweaks) */
+        --frameLevelW: clamp(90px, 10vw, 140px);
+        --frameCashW: clamp(96px, 16vw, 120px);
+        --frameEnergyW: clamp(86px, 14vw, 110px);
+        --frameEnergyH: clamp(210px, 34vw, 260px);
+        --pauseBtnW: clamp(88px, 16vw, 130px);
+        --igTargetW: clamp(96px, 16vw, 170px);
+        --igTargetH: calc(var(--igTargetW) * (656 / 1092));
+        --igTargetFootprintW: var(--igTargetW);
+        --igTargetFootprintH: var(--igTargetH);
+
+        --hudGapX: 6px;
+        --livesTopNudgeY: 0px;
+        --igTargetTopNudge: 0px;
+        --igTargetSwatchOffsetY: -10px;
+        /* Keep the baseline safe for HUD elements that were already perfect */
+        --hudTopBaseline: calc(var(--hudPadY) + env(safe-area-inset-top));
+
+        /* Top-align the *visible* frame boxes (tuned to your debug overlays) */
+        --hudLiftEnergy: -12px;
+        --hudLiftLives: -18px;
+        --hudLiftTarget: 2px;
+        --hudLiftPause: -18px;
+
+        /* Used to position Level/Cash beside Pause */
+        --hudPauseW: var(--pauseBtnW);
+
+        /* If the visible frame top looks "lower" than the element top, tweak these */
+        --livesFrameBgPosY: 40%;
+        --energyFrameBgPosY: 50%;
+        --targetFrameBgPosY: 50%;
       }
-      #igHud.igHud--cockpit.igHud--liquid .igHudPanel--left,
-      #igHud.igHud--cockpit.igHud--liquid .igHudPanel--right,
-      #igHud.igHud--cockpit.igHud--liquid .igHudRightStack,
-      #igHud.igHud--cockpit.igHud--liquid .igHudRightMeta {
-        display: contents !important;
+
+      #igHud.igHud--cockpit #igEnergy {
+        left: calc(var(--hudPadX) + env(safe-area-inset-left));
+        right: auto;
+        top: calc(
+          var(--hudTopBaseline)
+          + var(--frameLivesH)
+          + var(--hudGapY)
+          - 6px
+        );
+      }
+
+      #igHud.igHud--cockpit #livesOverlay.igLives {
+        left: calc(var(--hudPadX) + env(safe-area-inset-left));
+        right: auto;
+        top: calc(var(--hudTopBaseline) + var(--hudLiftLives) + var(--livesTopNudgeY));
+      }
+
+      /* Place pause to the left of the energy bar */
+      #igHud.igHud--cockpit #pauseBtn.igPauseBtn--cockpit {
+        right: calc(var(--hudPadX) + env(safe-area-inset-right) - 12px);
+        top: calc(var(--hudTopBaseline) + var(--hudLiftPause) + 12px);
+      }
+
+      /* Target top-middle aligned to the same baseline */
+      #igHud.igHud--cockpit #igTarget.igTarget--cockpit {
+        top: calc(var(--hudTopBaseline) + var(--hudLiftTarget));
+      }
+
+      /* Stack LEVEL then CASH under the pause button (still on the right side) */
+      #igHud.igHud--cockpit .igStat--level {
+        left: auto;
+        right: calc(
+          var(--hudPadX) + env(safe-area-inset-right)
+          + var(--hudPauseW) + var(--hudGapX)
+        );
+        top: var(--hudTopBaseline);
+      }
+
+      #igHud.igHud--cockpit .igStat--cash {
+        right: calc(
+          var(--hudPadX) + env(safe-area-inset-right)
+          - 6px
+        );
+        top: calc(
+          var(--hudTopBaseline)
+          + var(--hudPauseH)
+          + var(--hudGapY)
+        );
       }
     }
 
-    /* Tap-safe pause hit area */
-    #igHud.igHud--cockpit.igHud--liquid #pauseBtn.igPauseBtn--cockpit {
-      position: absolute !important;
-      left: 0 !important;
-      right: 0 !important;
-      top: 0 !important;
-      height: var(--hudTapHeight, 200px) !important;
-      width: 100% !important;
-      z-index: 999 !important;
-      opacity: 0 !important;
-      background: transparent !important;
-      pointer-events: auto !important;
+    /* --- Liquid HUD layout overrides (authoritative) --- */
+    #igHud.igHud--cockpit.igHud--liquid {
+      --liquidGap: 10px;
     }
 
-    body.modal-open #igHud.igHud--cockpit.igHud--liquid #pauseBtn.igPauseBtn--cockpit {
-      pointer-events: none !important;
-      display: none !important;
+    @media (min-width: 901px) {
+      #igHud.igHud--cockpit.igHud--liquid #igEnergy {
+        left: calc(var(--hudFlowInsetX) + env(safe-area-inset-left));
+        top: calc(var(--hudFlowTop) + var(--hudFlowHeight) - var(--frameEnergyH));
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
+        right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right));
+        left: auto;
+        top: calc(var(--hudFlowTop) + var(--hudFlowHeight) - var(--frameLivesH));
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
+        left: calc(var(--hudFlowInsetX) + env(safe-area-inset-left));
+        top: var(--hudFlowTop);
+        transform: none;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid #pauseBtn.igPauseBtn--cockpit {
+        right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right));
+        top: var(--hudFlowTop);
+        width: var(--pauseBtnW);
+        height: var(--pauseBtnH);
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
+        right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right));
+        top: var(--hudFlowTop);
+        transform: none;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
+        left: 50%;
+        top: calc(var(--hudFlowTop) + (var(--hudFlowHeight) * 0.5));
+        transform: translate(-50%, -50%);
+      }
     }
 
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives { grid-area: lives; }
-    #igHud.igHud--cockpit.igHud--liquid .igStat--level { grid-area: level; justify-self: stretch; }
-    #igHud.igHud--cockpit.igHud--liquid #igEnergy { grid-area: energy; }
-    #igHud.igHud--cockpit.igHud--liquid .igStat--cash { grid-area: cash; }
+    @media (max-width: 900px) {
+      #igHud.igHud--cockpit.igHud--liquid #igEnergy {
+        position: absolute !important;
+        left: calc(var(--hudFlowInsetX) + env(safe-area-inset-left)) !important;
+        top: calc(var(--hudFlowTop) + var(--hudFlowHeight) - var(--frameEnergyH)) !important;
+        transform: none !important;
+      }
 
-    /* Normalize pill layout: label top-left, value bottom-center */
+      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
+        position: absolute !important;
+        right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right)) !important;
+        left: auto !important;
+        top: calc(var(--hudFlowTop) + var(--hudFlowHeight) - var(--frameLivesH)) !important;
+        transform: none !important;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
+        position: absolute !important;
+        left: calc(var(--hudFlowInsetX) + env(safe-area-inset-left)) !important;
+        top: var(--hudFlowTop) !important;
+        transform: none !important;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
+        position: absolute !important;
+        right: calc(var(--hudFlowInsetX) + env(safe-area-inset-right)) !important;
+        top: var(--hudFlowTop) !important;
+        transform: none !important;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
+        position: absolute !important;
+        left: 50% !important;
+        top: calc(var(--hudFlowTop) + (var(--hudFlowHeight) * 0.5)) !important;
+        transform: translate(-50%, -50%) !important;
+      }
+
+      #igHud.igHud--cockpit.igHud--liquid #pauseBtn.igPauseBtn--cockpit {
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: auto;
+        height: auto;
+      }
+    }
+
+    /* --- Screenshot-inspired liquid header HUD --- */
+    #igHud.igHud--cockpit.igHud--liquid {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: clamp(8px, 2vw, 18px) !important;
+      padding: calc(var(--hudFlowInsetY) + env(safe-area-inset-top))
+        calc(var(--hudFlowInsetX) + env(safe-area-inset-right))
+        0
+        calc(var(--hudFlowInsetX) + env(safe-area-inset-left)) !important;
+      height: auto !important;
+    }
+
     #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
     #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
     #igHud.igHud--cockpit.igHud--liquid #igEnergy,
+    #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit,
     #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-      display: grid;
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-      align-content: stretch;
-      row-gap: 2px;
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives .igLabel,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igLabel,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--level .igLabel,
-    #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
-      margin: 0;
-      height: auto;
-      padding-left: 2px;
-      padding-top: 1px;
-      font-size: var(--hudLabelSize) !important;
-      letter-spacing: var(--hudLabelTrack);
-      font-family: var(--hudFont);
-      text-transform: uppercase;
-      font-weight: 600;
-      color: rgba(230, 240, 255, 0.92);
-      justify-self: start;
-      align-self: start;
-      grid-column: 1;
-      grid-row: 1;
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives #livesContainer::before,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue,
-    #igHud.igHud--cockpit.igHud--liquid .igEnergyBar .igEnergyPct {
-      font-size: var(--hudValueSize) !important;
-      letter-spacing: var(--hudValueTrack);
-      font-family: var(--hudFont);
-      font-weight: 700;
-      line-height: 1.1;
-      justify-self: center;
-      align-self: end;
-      grid-column: 1;
-      grid-row: 2;
-      text-align: center;
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
-      content: none !important;
+      position: relative !important;
+      left: auto !important;
+      right: auto !important;
+      top: auto !important;
+      bottom: auto !important;
+      transform: none !important;
     }
 
     #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
       order: 1;
-      width: 100%;
-      height: var(--hudPillH);
-      padding: 10px 12px;
+      min-width: clamp(120px, 16vw, 170px);
+      height: clamp(56px, 7vw, 72px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px 10px 46px;
       border-radius: 14px;
-      background: linear-gradient(180deg, rgba(255, 60, 190, 0.28), rgba(0,0,0,0.24));
-      border: 1px solid rgba(255, 90, 220, 0.7);
-      box-shadow: 0 10px 26px rgba(0,0,0,0.34), 0 0 16px rgba(255, 90, 220, 0.25);
+      background: linear-gradient(180deg, rgba(255, 60, 90, 0.22), rgba(0,0,0,0.20));
+      border: 1px solid rgba(255, 80, 110, 0.45);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.28);
+    }
+    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
+      content: '❤';
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 20px;
+      color: #ff4d6d;
+      text-shadow: 0 0 14px rgba(255, 80, 110, 0.45);
+    }
+    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives .igLabel {
+      position: static;
+      margin: 0;
+      font-size: 10px;
+      letter-spacing: 0.14em;
     }
     #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives #livesContainer::before {
-      content: attr(data-lives-count);
-      color: rgba(255, 230, 250, 0.98);
-      text-shadow: 0 0 10px rgba(255, 120, 220, 0.35), 0 2px 0 rgba(0,0,0,0.55);
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives #livesContainer {
-      grid-column: 1;
-      grid-row: 2;
-      justify-self: center;
-      align-self: end;
-      text-align: center;
-      display: block;
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives .heart {
-      display: none;
+      font-size: 22px;
+      letter-spacing: 0.04em;
+      color: rgba(255, 220, 230, 0.98);
+      text-shadow: 0 2px 0 rgba(0,0,0,0.55);
     }
 
     #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
       order: 2;
-      width: 100%;
-      height: var(--hudPillH);
-      padding: 10px 12px;
+      min-width: clamp(140px, 18vw, 190px);
+      height: clamp(56px, 7vw, 72px);
+      padding: 10px 14px 10px 46px;
       border-radius: 14px;
-      background: linear-gradient(180deg, rgba(255, 210, 60, 0.22), rgba(0,0,0,0.24));
-      border: 1px solid rgba(255, 210, 80, 0.7);
-      box-shadow: 0 10px 26px rgba(0,0,0,0.34), 0 0 16px rgba(255, 210, 90, 0.25);
+      background: linear-gradient(180deg, rgba(150, 70, 255, 0.22), rgba(0,0,0,0.22));
+      border: 1px solid rgba(170, 110, 255, 0.50);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.28);
     }
     #igHud.igHud--cockpit.igHud--liquid .igStat--cash::after {
-      content: none;
+      content: '';
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      width: 18px;
+      height: 18px;
+      transform: translateY(-50%);
+      background: linear-gradient(135deg, #ff70ff, #9f6bff);
+      border-radius: 4px;
+      box-shadow: 0 0 16px rgba(160, 90, 255, 0.45);
+    }
+    #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igLabel {
+      position: static;
+      margin: 0 0 2px;
+      font-size: 10px;
+      letter-spacing: 0.14em;
     }
     #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-      color: #ffe4a0;
-      text-shadow: 0 0 14px rgba(255, 210, 90, 0.55);
+      position: static;
+      transform: none;
+      font-size: 20px;
+      letter-spacing: 0.04em;
+      color: #d6a6ff;
     }
 
     #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
       order: 3;
       flex: 1 1 auto;
-      min-width: clamp(180px, 24vw, 280px);
-      max-width: clamp(220px, 28vw, 320px);
+      min-width: clamp(220px, 32vw, 360px);
+      max-width: clamp(260px, 34vw, 420px);
       height: clamp(64px, 9vw, 96px);
       padding: 10px 14px;
       border-radius: 16px;
-      background: linear-gradient(180deg, rgba(0, 210, 255, 0.26), rgba(0,0,0,0.24));
-      border: 1px solid rgba(70, 230, 255, 0.75);
-      box-shadow: 0 14px 32px rgba(0,0,0,0.34), 0 0 20px rgba(80, 230, 255, 0.3);
+      background: linear-gradient(180deg, rgba(0, 180, 255, 0.18), rgba(0,0,0,0.22));
+      border: 1px solid rgba(0, 200, 255, 0.45);
+      box-shadow: 0 14px 30px rgba(0,0,0,0.32);
       display: grid;
-      grid-template-columns: 1fr;
+      grid-template-columns: auto 1fr;
+      column-gap: 12px;
       align-items: center;
-      position: relative;
     }
-    /* Target pill removed */
-    #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit,
-    #igHud.igHud--cockpit.igHud--liquid #nextColorSwatch.igHudLegacySwatch {
-      display: none !important;
+    #igHud.igHud--cockpit.igHud--liquid #igTarget::before {
+      content: '⟲  PRIORITY TARGET  ⟲';
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: rgba(120, 240, 255, 0.8);
+      text-shadow: 0 0 10px rgba(0, 200, 255, 0.35);
+      white-space: nowrap;
     }
-    #igHud.igHud--cockpit.igHud--liquid #nextColorName {
-      font-size: 20px;
-      letter-spacing: var(--hudValueTrack);
-      font-family: var(--hudFont);
-      font-weight: 700;
-      color: #91f2ff;
-      text-shadow: 0 0 16px rgba(70, 230, 255, 0.55);
-      text-transform: uppercase;
-      text-align: left;
+    #igHud.igHud--cockpit.igHud--liquid .igTargetOrb {
+      width: clamp(48px, 7vw, 72px);
+      height: clamp(48px, 7vw, 72px);
     }
-    #igHud.igHud--cockpit.igHud--liquid #nextColorSwatch.igHudLegacySwatch {
-      display: none !important;
+    #igHud.igHud--cockpit.igHud--liquid .igTargetRing,
+    #igHud.igHud--cockpit.igHud--liquid .igTargetRing::before {
+      border-radius: 999px;
+    }
+    #igHud.igHud--cockpit.igHud--liquid #igTargetSwatch.igSwatch {
+      width: clamp(26px, 4vw, 42px);
+      height: clamp(26px, 4vw, 42px);
+      transform: none;
+      background: rgba(255, 210, 120, 0.9);
+      box-shadow: 0 0 22px rgba(255, 210, 120, 0.45);
     }
     #igHud.igHud--cockpit.igHud--liquid .igTargetText--cockpit {
       display: grid;
       justify-items: start;
-      gap: 0;
+      gap: 2px;
       padding: 0;
       border: none;
       background: transparent;
       box-shadow: none;
     }
-    #igHud.igHud--cockpit.igHud--liquid .igTargetOrb,
-    #igHud.igHud--cockpit.igHud--liquid .igTargetRing,
-    #igHud.igHud--cockpit.igHud--liquid .igTargetRing::before,
-    #igHud.igHud--cockpit.igHud--liquid #igTargetSwatch.igSwatch,
     #igHud.igHud--cockpit.igHud--liquid #igTargetWord {
-      display: none;
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.2em;
+      color: rgba(180, 220, 255, 0.7);
     }
-    #igHud.igHud--cockpit.igHud--liquid #igTarget::before {
-      content: none;
+    #igHud.igHud--cockpit.igHud--liquid #nextColorName {
+      font-size: 20px;
+      letter-spacing: 0.06em;
+      color: #7de7ff;
+      text-shadow: 0 0 12px rgba(0, 200, 255, 0.35);
     }
 
     #igHud.igHud--cockpit.igHud--liquid #igEnergy {
-      order: 2;
-      width: 100%;
-      height: var(--hudPillH);
+      order: 4;
+      min-width: clamp(160px, 20vw, 210px);
+      height: clamp(56px, 7vw, 72px);
       padding: 10px 14px;
       border-radius: 14px;
-      background: linear-gradient(180deg, rgba(64, 160, 255, 0.18), rgba(0,0,0,0.24));
-      border: 1px solid rgba(90, 170, 255, 0.7);
-      box-shadow: 0 10px 26px rgba(0,0,0,0.34), 0 0 18px rgba(90, 170, 255, 0.3);
+      background: linear-gradient(180deg, rgba(20, 80, 255, 0.16), rgba(0,0,0,0.22));
+      border: 1px solid rgba(80, 140, 255, 0.45);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.28);
       display: grid;
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
+      grid-template-columns: auto 1fr auto;
       align-items: center;
       column-gap: 10px;
-      row-gap: 10px;
-      position: relative;
-      overflow: hidden;
     }
-    #igHud.igHud--cockpit.igHud--liquid #igEnergy::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      width: calc(var(--p) * 100%);
-      background: linear-gradient(180deg, rgba(64, 160, 255, 0.55), rgba(20, 80, 220, 0.35));
-      box-shadow: inset 0 0 18px rgba(80, 170, 255, 0.45);
-      z-index: 0;
+    #igHud.igHud--cockpit.igHud--liquid #igEnergy::before {
+      content: '⚡';
+      font-size: 16px;
+      color: #ffd24a;
+      text-shadow: 0 0 12px rgba(255, 210, 74, 0.45);
     }
-    #igHud.igHud--cockpit.igHud--liquid #igEnergy > * {
-      position: relative;
-      z-index: 1;
+    #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
+      display: block;
+      margin: 0;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: rgba(200, 220, 255, 0.8);
     }
     #igHud.igHud--cockpit.igHud--liquid .igEnergyBar {
-      width: 100%;
-      height: 100%;
-      display: grid;
-      align-items: end;
-      justify-items: center;
-      border-radius: 0;
-      background: transparent;
-      border: none;
-      overflow: visible;
-      box-shadow: none;
-      grid-column: 1 / -1;
-      grid-row: 2;
-      justify-self: stretch;
+      width: clamp(90px, 14vw, 140px);
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.16);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
     }
     #igHud.igHud--cockpit.igHud--liquid .igEnergyFill {
-      display: none;
-    }
-    #igHud.igHud--cockpit.igHud--liquid .igEnergyCore {
-      display: none;
+      top: 0;
+      bottom: auto;
+      left: 0;
+      right: auto;
+      height: 100%;
+      width: calc(var(--p) * 100%) !important;
+      transform: none;
+      border-radius: 999px;
     }
     #igHud.igHud--cockpit.igHud--liquid .igEnergyBar .igEnergyPct {
-      color: #f4fbff;
-      text-shadow: 0 0 14px rgba(90, 170, 255, 0.8), 0 2px 0 rgba(0,0,0,0.6);
       position: static;
-      inset: auto;
-      grid-row: auto;
-      grid-column: auto;
-      align-self: end;
-      justify-self: center;
-      padding-bottom: 0;
-    }
-    #igHud.igHud--cockpit.igHud--liquid #igEnergy .igEnergyLabel {
-      color: #e9f5ff;
-      text-shadow: 0 0 12px rgba(90, 170, 255, 0.6);
+      transform: none;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      color: #7dbbff;
     }
 
     #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-      order: 1;
-      width: 100%;
-      height: var(--hudPillH);
+      order: 5;
+      min-width: clamp(72px, 10vw, 96px);
+      height: clamp(56px, 7vw, 72px);
       padding: 10px 12px;
       border-radius: 14px;
-      background: linear-gradient(180deg, rgba(0, 255, 200, 0.24), rgba(0,0,0,0.24));
-      grid-row: 1;
-      border: 1px solid rgba(90, 255, 220, 0.75);
-      box-shadow: 0 10px 26px rgba(0,0,0,0.34), 0 0 18px rgba(90, 255, 220, 0.3);
-    }
-    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-    #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-    #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-      box-sizing: border-box;
-      max-width: 100%;
+      background: linear-gradient(180deg, rgba(0, 255, 160, 0.16), rgba(0,0,0,0.22));
+      border: 1px solid rgba(90, 255, 170, 0.45);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.28);
+      display: grid;
+      place-items: center;
     }
     #igHud.igHud--cockpit.igHud--liquid .igStat--level .igLabel {
-      color: rgba(190, 255, 235, 0.95);
+      position: static;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: rgba(170, 255, 210, 0.85);
+      margin: 0;
     }
     #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue {
-      color: #7bffd9;
-      text-shadow: 0 0 14px rgba(90, 255, 220, 0.55);
-    }
-
-    /* Remove legacy dots inside pills */
-    #igHud.igHud--cockpit.igHud--liquid .igStat::before {
-      content: none;
-      display: none;
+      position: static;
+      font-size: 22px;
+      color: #6dffb6;
+      text-shadow: 0 0 10px rgba(80, 255, 180, 0.35);
+      transform: none;
     }
 
     @media (max-width: 900px) {
       #igHud.igHud--cockpit.igHud--liquid {
-        display: grid !important;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        grid-template-areas:
-          "level cash"
-          "energy lives";
-        --hudPillH: clamp(44px, 9.6vw, 58px);
+        flex-wrap: wrap !important;
         row-gap: 10px !important;
-        column-gap: 8px !important;
-        width: 100% !important;
-        box-sizing: border-box;
-        overflow-x: hidden;
-        padding-left: calc(max(8px, var(--hudFlowInsetX)) + env(safe-area-inset-left)) !important;
-        padding-right: calc(max(8px, var(--hudFlowInsetX)) + env(safe-area-inset-right)) !important;
       }
-      #igHud.igHud--cockpit.igHud--liquid .igHudPanel--left,
-      #igHud.igHud--cockpit.igHud--liquid .igHudPanel--right,
-      #igHud.igHud--cockpit.igHud--liquid .igHudRightStack,
-      #igHud.igHud--cockpit.igHud--liquid .igHudRightMeta {
-        display: contents !important;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        z-index: 6;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives { grid-area: lives; }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level { grid-area: level; }
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy { grid-area: energy; }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash { grid-area: cash; }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        height: var(--hudPillH);
-        min-height: 0;
-        padding: 6px 10px;
-        border-radius: 10px;
+      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
+        order: 3;
+        flex: 1 1 100%;
         max-width: 100%;
-        min-width: 0;
-        justify-self: stretch;
-        width: 100%;
       }
       #igHud.igHud--cockpit.igHud--liquid #igEnergy {
-        padding: 6px 10px;
-        display: grid;
-        grid-template-columns: auto 1fr;
-        grid-template-rows: auto auto;
-        column-gap: 8px;
-        row-gap: 6px;
-        min-width: 0;
-        width: 100%;
-        height: var(--hudPillH);
-        min-height: 0;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        min-width: clamp(52px, 14vw, 68px);
-        padding: 6px 8px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        min-width: 0;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igLabel,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-        max-width: 100%;
-        overflow: hidden;
-      #igHud.igHud--cockpit.igHud--liquid #activeOverlay {
-        gap: 5px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igPowerPill {
-        height: var(--hudPowerPillH, 32px);
-        min-width: 64px;
-        padding: 4px 6px;
-        border-radius: 9px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igPowerPillLabel { font-size: 8px; }
-      #igHud.igHud--cockpit.igHud--liquid .igPowerPillValue { font-size: 12px; }
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        padding-right: 6px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
-        min-width: 0;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash::after,
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
-        left: 10px;
-        font-size: 16px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igLabel,
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
-        font-size: 9px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-        font-size: 18px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar {
-        height: 100%;
-        width: 100%;
-        grid-column: 1 / -1;
-        grid-row: 2;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar .igEnergyPct {
-        font-size: 12px;
+        order: 4;
+        flex: 1 1 auto;
       }
     }
 
-    @media (max-width: 720px) {
+    /* --- Liquid header HUD (recreated layout) --- */
+    #igHud.igHud--cockpit.igHud--liquid {
+      --hudHeaderInsetX: clamp(10px, 2.5vw, 18px);
+      --hudHeaderInsetY: clamp(8px, 2vw, 14px);
+      --hudHeaderGapX: clamp(8px, 2vw, 16px);
+      --hudHeaderGapY: clamp(6px, 1.4vw, 12px);
+      --hudHeaderRow1: clamp(64px, 8vw, 84px);
+      --hudHeaderRow2: clamp(54px, 7vw, 72px);
+
+      --frameLivesW: clamp(120px, 18vw, 170px);
+      --frameLivesH: clamp(50px, 7vw, 68px);
+      --frameCashW: clamp(120px, 18vw, 170px);
+      --frameCashH: clamp(40px, 6vw, 56px);
+      --frameEnergyW: clamp(70px, 10vw, 100px);
+      --frameEnergyH: clamp(120px, 18vw, 180px);
+      --frameLevelW: clamp(90px, 12vw, 120px);
+      --frameLevelH: clamp(50px, 7vw, 68px);
+
+      --igTargetW: clamp(120px, 16vw, 180px);
+      --igTargetH: clamp(80px, 12vw, 120px);
+      --igTargetFootprintW: var(--igTargetW);
+      --igTargetFootprintH: var(--igTargetH);
+      --igTargetSwatchSize: clamp(28px, 5vw, 44px);
+
+      display: grid !important;
+      grid-template-columns: auto 1fr auto !important;
+      grid-template-rows: var(--hudHeaderRow1) var(--hudHeaderRow2) !important;
+      grid-template-areas:
+        "lives target cash"
+        "energy target level" !important;
+      gap: var(--hudHeaderGapY) var(--hudHeaderGapX) !important;
+      padding: var(--hudHeaderInsetY) var(--hudHeaderInsetX) 0 !important;
+      align-content: start !important;
+      align-items: center !important;
+      justify-items: start !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid #igEnergy {
+      grid-area: energy !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
+      grid-area: lives !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+      justify-self: start !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid .igStat--level {
+      grid-area: level !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+      justify-self: end !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
+      grid-area: cash !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+      justify-self: end !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
+      grid-area: target !important;
+      position: relative !important;
+      left: auto !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+      justify-self: center !important;
+      align-self: center !important;
+    }
+
+    #igHud.igHud--cockpit.igHud--liquid #pauseBtn.igPauseBtn--cockpit {
+      position: absolute !important;
+      left: calc(var(--hudHeaderInsetX) + env(safe-area-inset-left)) !important;
+      right: calc(var(--hudHeaderInsetX) + env(safe-area-inset-right)) !important;
+      top: calc(var(--hudHeaderInsetY) + env(safe-area-inset-top)) !important;
+      height: calc(var(--hudHeaderRow1) + var(--hudHeaderRow2) + var(--hudHeaderGapY)) !important;
+      width: auto !important;
+    }
+
+    @media (max-width: 900px) {
       #igHud.igHud--cockpit.igHud--liquid {
-        row-gap: 8px !important;
-        column-gap: 6px !important;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        height: auto;
-        min-height: clamp(38px, 8vw, 48px);
-        padding: 5px 8px 5px 30px;
-        border-radius: 9px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy {
-        padding: 5px 8px;
-        column-gap: 6px;
-        row-gap: 2px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        padding: 5px 8px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        min-width: clamp(48px, 13vw, 64px);
-        padding: 5px 7px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        min-width: clamp(92px, 28vw, 130px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
-        min-width: clamp(88px, 26vw, 122px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash::after,
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
-        left: 8px;
-        font-size: 14px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
-        height: clamp(48px, 10vw, 60px);
-        border-radius: 10px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #nextColorName {
-        font-size: 15px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igLabel,
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
-        font-size: 7.5px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-        font-size: 16px;
+        --hudHeaderInsetX: clamp(8px, 3vw, 14px);
+        --hudHeaderInsetY: clamp(6px, 2vw, 12px);
+        --hudHeaderRow1: clamp(56px, 14vw, 70px);
+        --hudHeaderRow2: clamp(48px, 12vw, 64px);
+        --frameEnergyH: clamp(100px, 24vw, 150px);
+        --igTargetW: clamp(96px, 22vw, 140px);
+        --igTargetH: clamp(64px, 16vw, 100px);
       }
     }
-
-    @media (max-width: 600px) {
-      #igHud.igHud--cockpit.igHud--liquid {
-        row-gap: 6px !important;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        height: auto;
-        min-height: clamp(34px, 7.4vw, 44px);
-        padding: 4px 6px 4px 26px;
-        border-radius: 8px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy {
-        padding: 4px 6px;
-        column-gap: 5px;
-        row-gap: 2px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        padding: 4px 6px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        min-width: clamp(44px, 12vw, 58px);
-        padding: 4px 6px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        min-width: clamp(84px, 26vw, 120px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
-        min-width: clamp(80px, 24vw, 114px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash::after,
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
-        left: 7px;
-        font-size: 13px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
-        height: clamp(44px, 9.4vw, 56px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid #nextColorName {
-        font-size: 14px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igLabel,
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
-        font-size: 7.5px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-        font-size: 15px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar {
-        height: 100%;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar .igEnergyPct {
-        font-size: 9px;
-      }
-    }
-
-    @media (max-width: 420px) {
-      #igHud.igHud--cockpit.igHud--liquid {
-        row-gap: 5px !important;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash,
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        height: auto;
-        min-height: clamp(30px, 7vw, 40px);
-        padding: 3px 5px 3px 22px;
-        border-radius: 7px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igEnergy {
-        padding: 3px 5px;
-        column-gap: 4px;
-        row-gap: 2px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        padding: 3px 5px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level {
-        min-width: clamp(40px, 11vw, 54px);
-        padding: 3px 5px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash {
-        min-width: clamp(76px, 24vw, 108px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives {
-        min-width: clamp(72px, 22vw, 104px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash::after,
-      #igHud.igHud--cockpit.igHud--liquid #livesOverlay.igLives::before {
-        left: 6px;
-        font-size: 12px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid #igTarget.igTarget--cockpit {
-        height: clamp(40px, 9vw, 50px);
-      }
-      #igHud.igHud--cockpit.igHud--liquid #nextColorName {
-        font-size: 13px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igLabel,
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyLabel {
-        font-size: 7px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igStat--level .igValue,
-      #igHud.igHud--cockpit.igHud--liquid .igStat--cash .igValue {
-        font-size: 14px;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar {
-        height: 100%;
-      }
-      #igHud.igHud--cockpit.igHud--liquid .igEnergyBar .igEnergyPct {
-        font-size: 8.5px;
-      }
-    }
-
-
-
 
     /* ---------- Shooter HUD (SCI-FI PLATE / CONSOLE) ---------- */
     /* Inspired by the reference image: metal UI plates + neon indicators.
@@ -864,9 +1500,8 @@
       width: clamp(160px, 22vw, 220px);
       height: 14px;
       border-radius: 12px;
-      background: transparent;
-      box-shadow: none;
-      opacity: 0;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.12);
       box-shadow: 0 10px 18px rgba(0,0,0,0.22);
     }
 
@@ -876,6 +1511,10 @@
     }
 
     /* Disable the animated shimmer layer for performance. */
+    #igHud.igHud--sciFiPlate .igEnergyCore {
+      display: none;
+      animation: none;
+    }
 
     #igHud.igHud--sciFiPlate .igEnergyBar .igEnergyPct {
       font-size: 11px;
@@ -893,12 +1532,10 @@
       border: none;
       box-shadow: none;
       filter: none;
-      display: grid;
-      grid-template-rows: auto auto;
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      column-gap: 10px;
-      row-gap: 6px;
+    }
+
+    #igHud.igHud--sciFiPlate #livesOverlay.igLives .igLabel {
+      display: block;
       font-size: 10px;
       letter-spacing: 0.16em;
       color: rgba(210,240,255,0.70);
@@ -912,8 +1549,6 @@
 
     #igHud.igHud--sciFiPlate #livesOverlay.igLives .heart {
       width: 18px;
-      grid-column: 2 / 4;
-      align-self: center;
       height: 18px;
       border-radius: 999px;
       position: relative;
@@ -923,7 +1558,6 @@
       border: 1px solid rgba(255,255,255,0.14);
       box-shadow: 0 0 14px rgba(255, 180, 60, 0.10);
       transform: none;
-      grid-column: 2 / 4;
       animation: none;
     }
 
@@ -1122,11 +1756,32 @@
       }
     }
 
-    /* Frame overlay removed for clean HUD */
-    #igHud.igHud--cockpit::before,
-    #igHud.igHud--cockpit::after {
+    /* Base panels */
+    .igHudPanel {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0;
+      margin: 0;
+      min-height: 0;
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      overflow: visible;
+      clip-path: none;
+    }
+    .igHudPanel::before,
+    .igHudPanel::after {
       content: none;
     }
+
+    .igHudPanel--left { grid-area: left; justify-content: flex-start; }
+    .igHudPanel--center { grid-area: center; justify-content: center; min-width: 0; }
+    .igHudPanel--right { grid-area: right; justify-content: flex-end; gap: clamp(8px, 1.2vw, 12px); }
+
     .igStat {
       --accent: #66ccff;
       --accentGlow: rgba(102, 204, 255, 0.16);

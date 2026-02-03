@@ -61,6 +61,9 @@ const PRECACHE_URLS = [
   './src/game/enemy2d.js',
   './manifest.webmanifest',
   './icons/icon.svg',
+  './assets/cyberyolks_icon_192.png',
+  './assets/cyberyolks_icon_512.png',
+  './.well-known/assetlinks.json',
 ];
 
 self.addEventListener('install', (event) => {
