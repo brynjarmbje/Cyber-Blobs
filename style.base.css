@@ -683,14 +683,16 @@ html, body {
     opacity: 1;
     position: relative;
     display: inline-block;
-    color: #000000;
+    color: #ffffff;
     mix-blend-mode: normal;
     filter: none;
     font-size: 18px;
     line-height: 1;
     letter-spacing: 0.04em;
-    font-weight: 750;
-    text-shadow: none;
+    font-weight: 600;
+    text-shadow:
+      0 1px 0 rgba(0,0,0,0.28),
+      0 6px 16px rgba(0,0,0,0.28);
   }
 
   .mainMenu.mainMenu--classic .mainMenuBtn .mmText::before,

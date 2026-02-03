@@ -726,9 +726,31 @@ export function createRenderer3D(glCanvas) {
     depthTest: false,
   });
 
+  // Shield overlay for invulnerable yolks (cyber cyan).
+  const enemyShieldBaseMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x46f7ff),
+    transparent: true,
+    opacity: 0.22,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+  });
+  const enemyShieldWireMat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(0x46f7ff),
+    transparent: true,
+    opacity: 0.38,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    depthTest: true,
+    wireframe: true,
+  });
+
   const enemyMeshes = [];
   const enemyGlowMeshes = [];
   const enemyCoreMeshes = [];
+  const enemyShieldMeshes = [];
+  const enemyShieldWireMeshes = [];
 
   // Optional HUD "NEXT" enemy preview (separate tiny WebGL renderer).
   let nextPreviewCanvas = null;
@@ -1551,12 +1573,30 @@ export function createRenderer3D(glCanvas) {
       c.renderOrder = 56;
       worldRoot.add(c);
       enemyCoreMeshes.push(c);
+
+      const shieldMat = enemyShieldBaseMat.clone();
+      attachJellyWobble(shieldMat);
+      const s = new THREE.Mesh(enemyGeo, shieldMat);
+      s.visible = false;
+      s.renderOrder = 54;
+      worldRoot.add(s);
+      enemyShieldMeshes.push(s);
+
+      const wireMat = enemyShieldWireMat.clone();
+      attachJellyWobble(wireMat);
+      const w = new THREE.Mesh(enemyGeo, wireMat);
+      w.visible = false;
+      w.renderOrder = 57;
+      worldRoot.add(w);
+      enemyShieldWireMeshes.push(w);
     }
 
     for (let i = count; i < enemyMeshes.length; i++) {
       enemyMeshes[i].visible = false;
       enemyGlowMeshes[i].visible = false;
       enemyCoreMeshes[i].visible = false;
+      if (enemyShieldMeshes[i]) enemyShieldMeshes[i].visible = false;
+      if (enemyShieldWireMeshes[i]) enemyShieldWireMeshes[i].visible = false;
     }
   }
 
@@ -2112,6 +2152,24 @@ export function createRenderer3D(glCanvas) {
         c.scale.set(sx * 0.62 * pulse, sy * 0.62 * pulse, sz * 0.62 * pulse);
         c.material.color.copy(tmpColor);
         c.material.opacity = 0.40;
+      }
+
+      // Shield overlay for invulnerable enemies.
+      const shield = enemyShieldMeshes[i];
+      const shieldWire = enemyShieldWireMeshes[i];
+      const shieldOn = !isTargetEnemy;
+      if (shield) shield.visible = shieldOn;
+      if (shieldWire) shieldWire.visible = shieldOn;
+      if (shieldOn && shield && shieldWire) {
+        const sp = 0.5 + 0.5 * Math.sin(tNow / 180 + (e.blobSeed || 0));
+        const shieldScale = 1.18 + sp * 0.05;
+        shield.position.set(ex, ey, 20);
+        shield.scale.set(sx * shieldScale, sy * shieldScale, sz * shieldScale);
+        shield.material.opacity = 0.18 + sp * 0.18;
+
+        shieldWire.position.set(ex, ey, 20);
+        shieldWire.scale.set(sx * (shieldScale + 0.02), sy * (shieldScale + 0.02), sz * (shieldScale + 0.02));
+        shieldWire.material.opacity = 0.26 + sp * 0.22;
       }
 
       // shadow

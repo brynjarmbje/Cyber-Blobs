@@ -43,7 +43,7 @@ export function openLevelSelectModal(
 
   // Back button behavior.
   if (ui.closeLevelSelectBtn) {
-    ui.closeLevelSelectBtn.textContent = allowBackToMenu ? 'Back' : 'Close';
+    ui.closeLevelSelectBtn.textContent = 'Close';
   }
 }
 

@@ -2935,7 +2935,12 @@ export function createGame(ui) {
           player.x = pushed.x;
           player.y = pushed.y;
 
-          player.energy = ENERGY_MAX * 0.2;
+          // On life loss, ensure the player isn't left with *too little* energy,
+          // but don't punish them by dropping energy down to the minimum.
+          const minEnergyAfterLifeLoss = ENERGY_MAX * 0.2;
+          if (player.energy < minEnergyAfterLifeLoss) {
+            player.energy = minEnergyAfterLifeLoss;
+          }
           clearEnergyDock();
         }
       }
@@ -3230,10 +3235,13 @@ export function createGame(ui) {
     window.addEventListener('scroll', refreshCanvasRect, { passive: true });
   }
 
-  function installJoystick(stickEl, knobEl, axis) {
+  function installJoystick(stickEl, knobEl, axis, zoneEl) {
     if (!stickEl || !knobEl) return;
 
     let pointerId = null;
+    let center = null;
+
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
     const setKnob = (nx, ny) => {
       const r = stickEl.clientWidth / 2;
@@ -3243,8 +3251,8 @@ export function createGame(ui) {
 
     const updateFromEvent = (e) => {
       const rect = stickEl.getBoundingClientRect();
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
+      const cx = center ? center.x : rect.left + rect.width / 2;
+      const cy = center ? center.y : rect.top + rect.height / 2;
       const dx = e.clientX - cx;
       const dy = e.clientY - cy;
       const r = rect.width / 2;
@@ -3264,29 +3272,63 @@ export function createGame(ui) {
       axis.y = 0;
       axis.active = false;
       knobEl.style.transform = 'translate(-50%, -50%)';
+      center = null;
+      stickEl.classList.remove('isFloating');
+      stickEl.style.left = '';
+      stickEl.style.top = '';
     };
 
-    stickEl.addEventListener('pointerdown', (e) => {
+    const start = (e) => {
       pointerId = e.pointerId;
-      stickEl.setPointerCapture(pointerId);
+      const captureEl = zoneEl || stickEl;
+      captureEl.setPointerCapture(pointerId);
+
+      if (zoneEl) {
+        const zoneRect = zoneEl.getBoundingClientRect();
+        const parentRect = stickEl.parentElement?.getBoundingClientRect();
+        const r = stickEl.clientWidth / 2;
+        const cx = clamp(e.clientX, zoneRect.left + r, zoneRect.right - r);
+        const cy = clamp(e.clientY, zoneRect.top + r, zoneRect.bottom - r);
+        center = { x: cx, y: cy };
+
+        if (parentRect) {
+          stickEl.classList.add('isFloating');
+          stickEl.style.left = `${cx - r - parentRect.left}px`;
+          stickEl.style.top = `${cy - r - parentRect.top}px`;
+        }
+      }
+
       updateFromEvent(e);
       e.preventDefault();
-    });
-    stickEl.addEventListener('pointermove', (e) => {
+    };
+
+    const move = (e) => {
       if (pointerId !== e.pointerId) return;
       updateFromEvent(e);
       e.preventDefault();
-    });
-    stickEl.addEventListener('pointerup', (e) => {
+    };
+
+    const end = (e) => {
       if (pointerId !== e.pointerId) return;
       pointerId = null;
       reset();
       e.preventDefault();
-    });
-    stickEl.addEventListener('pointercancel', () => {
+    };
+
+    const cancel = () => {
       pointerId = null;
       reset();
-    });
+    };
+
+    const downEl = zoneEl || stickEl;
+    downEl.addEventListener('pointerdown', start);
+    downEl.addEventListener('pointermove', move);
+    downEl.addEventListener('pointerup', end);
+    downEl.addEventListener('pointercancel', cancel);
+    stickEl.addEventListener('pointerdown', start);
+    stickEl.addEventListener('pointermove', move);
+    stickEl.addEventListener('pointerup', end);
+    stickEl.addEventListener('pointercancel', cancel);
   }
 
   function resizeCanvasToCssSize() {
@@ -3373,8 +3415,8 @@ export function createGame(ui) {
     }
 
     // Touch controls
-    installJoystick(ui.moveStick, ui.moveKnob, axes.move);
-    installJoystick(ui.aimStick, ui.aimKnob, axes.aim);
+    installJoystick(ui.moveStick, ui.moveKnob, axes.move, ui.moveZone);
+    installJoystick(ui.aimStick, ui.aimKnob, axes.aim, ui.aimZone);
 
     // Boot into the main menu. Game starts after player chooses a level.
     showMainMenu();

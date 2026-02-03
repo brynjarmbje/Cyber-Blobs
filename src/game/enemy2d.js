@@ -167,6 +167,35 @@ export function drawJellyBlobEnemy(ctx, e, nowMs, isNext) {
   ctx.stroke();
   ctx.restore();
 
+  // Shield overlay for invulnerable yolks (non-targets).
+  if (!isNext) {
+    const pulse = 0.5 + 0.5 * Math.sin(nowMs / 180 + (e.blobSeed || 0));
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.18 + pulse * 0.22;
+    ctx.strokeStyle = 'rgba(70, 247, 255, 0.9)';
+    ctx.lineWidth = 2.5;
+    ctx.setLineDash([6, 5]);
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, r + 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = 0.12 + pulse * 0.12;
+    ctx.fillStyle = 'rgba(40, 200, 255, 0.18)';
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, r + 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = 'rgba(230, 255, 255, 0.9)';
+    ctx.font = `${Math.max(10, r * 0.6)}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⛨', e.x, e.y);
+    ctx.restore();
+  }
+
   // Soft outer contour (keep it light so it doesn't look like a billiard ball)
   ctx.lineWidth = 1.25;
   ctx.strokeStyle = 'rgba(0,0,0,0.25)';

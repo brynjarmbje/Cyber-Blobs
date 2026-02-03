@@ -104,6 +104,8 @@ export function getUiElements() {
     moveKnob: document.getElementById('moveKnob'),
     aimStick: document.getElementById('aimStick'),
     aimKnob: document.getElementById('aimKnob'),
+    moveZone: document.getElementById('moveZone'),
+    aimZone: document.getElementById('aimZone'),
   };
 }
 
@@ -115,6 +117,93 @@ export function shortPowerName(type) {
   if (type === POWERUP_TYPES.bounce) return 'BNCE';
   if (type === POWERUP_TYPES.stasis) return 'STAS';
   return type;
+}
+
+function powerupAccent(type) {
+  if (type === POWERUP_TYPES.speed) return '#ff9b3d';
+  if (type === POWERUP_TYPES.fireRate) return '#4fe8ff';
+  if (type === POWERUP_TYPES.piercing) return '#b56cff';
+  if (type === POWERUP_TYPES.shotgun) return '#ffd54a';
+  if (type === POWERUP_TYPES.bounce) return '#4fa8ff';
+  if (type === POWERUP_TYPES.stasis) return '#38ffb3';
+  return '#66ccff';
+}
+
+function renderActivePowerUps(activeOverlayEl, activePowerUps, nowMs) {
+  if (!activeOverlayEl) return;
+  activeOverlayEl.innerHTML = '';
+
+  if (!Array.isArray(activePowerUps) || activePowerUps.length === 0) return;
+
+  const frag = document.createDocumentFragment();
+  for (const p of activePowerUps) {
+    const remain = Math.max(0, Math.ceil((p.endTime - nowMs) / 1000));
+    const pill = document.createElement('div');
+    pill.className = 'igPowerPill';
+    pill.dataset.type = String(p.type || '');
+
+    const accent = powerupAccent(p.type);
+    pill.style.setProperty('--accent', accent);
+    pill.style.setProperty('--accentGlow', hexToRgba(accent, 0.35));
+
+    const label = document.createElement('span');
+    label.className = 'igPowerPillLabel';
+    label.textContent = String(shortPowerName(p.type)).toUpperCase();
+
+    const value = document.createElement('span');
+    value.className = 'igPowerPillValue';
+    value.textContent = `${remain}s`;
+
+    pill.append(label, value);
+    frag.appendChild(pill);
+  }
+
+  activeOverlayEl.appendChild(frag);
+}
+
+function formatCashForHud(value) {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '0';
+
+  const sign = n < 0 ? '-' : '';
+  const abs = Math.abs(Math.trunc(n));
+
+  // Keep exact small numbers.
+  if (abs < 1000) return `${sign}${abs}`;
+
+  const units = [
+    { v: 1e12, s: 't' },
+    { v: 1e9, s: 'b' },
+    { v: 1e6, s: 'm' },
+    { v: 1e3, s: 'k' },
+  ];
+
+  // We want this to stay short for the cockpit frame.
+  const maxLen = 5; // e.g. 999k, 1.2m, 12.3m
+
+  for (let i = 0; i < units.length; i++) {
+    const { v, s } = units[i];
+    if (abs < v) continue;
+
+    // Start with 1 decimal for small leading digits, otherwise 0.
+    for (const decimals of abs < 10 * v ? [1, 0] : [0]) {
+      const scaled = abs / v;
+      const pow = 10 ** decimals;
+      const rounded = Math.round(scaled * pow) / pow;
+
+      // If rounding bumps us to the next unit (e.g. 999.9k -> 1.0m), retry using the next unit.
+      if (rounded >= 1000 && i > 0) break;
+
+      const txtNum = decimals === 0 ? String(Math.trunc(rounded)) : String(rounded);
+      const txt = `${sign}${txtNum}${s}`;
+      if (txt.length <= maxLen) return txt;
+    }
+
+    // Fall back (always returns something).
+    return `${sign}${Math.trunc(abs / v)}${s}`;
+  }
+
+  return `${sign}${abs}`;
 }
 
 export function renderLives(livesContainerEl, lives) {
@@ -149,6 +238,8 @@ export function updateHud(ui, state) {
     nukeCooldownSeconds,
     mouseAimEnabled,
   } = state;
+
+  const livesNum = Number.isFinite(Number(lives)) ? Math.max(0, Math.floor(Number(lives))) : 0;
 
   if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(level);
   if (ui.hudTimeEl) ui.hudTimeEl.textContent = String(Math.max(0, Math.floor(elapsedSeconds)));
@@ -194,23 +285,19 @@ export function updateHud(ui, state) {
   // If we render the nicer target preview in-game, mirror it into the top bar swatch.
   syncTargetSwatches(ui);
 
-  renderLives(ui.livesContainerEl, lives);
+  // Keep the legacy heart rendering (used by non-cockpit themes) but also expose the
+  // numeric lives value directly for the cockpit "window".
+  renderLives(ui.livesContainerEl, livesNum);
+  if (ui.livesContainerEl) ui.livesContainerEl.dataset.livesCount = String(livesNum);
 
   if (ui.activeOverlayEl) {
     const now = typeof nowMs === 'number' ? nowMs : performance.now();
-    ui.activeOverlayEl.textContent =
-      activePowerUps.length === 0
-        ? ''
-        : activePowerUps
-            .map((p) => {
-              const remain = Math.max(0, Math.ceil((p.endTime - now) / 1000));
-              return `${shortPowerName(p.type)} ${remain}s`;
-            })
-            .join(' • ');
+    renderActivePowerUps(ui.activeOverlayEl, activePowerUps, now);
   }
 
-  if (ui.cashEl) ui.cashEl.textContent = String(cash);
-  if (ui.scorePillValue) ui.scorePillValue.textContent = String(cash);
+  const cashHudText = formatCashForHud(cash);
+  if (ui.cashEl) ui.cashEl.textContent = cashHudText;
+  if (ui.scorePillValue) ui.scorePillValue.textContent = cashHudText;
 
   if (typeof laserText === 'string') {
     setUltButtonLabel(ui.ultBtn, laserText);
@@ -482,6 +569,7 @@ export function openModal(modal) {
   } catch {
     // ignore
   }
+  document.body?.classList.add('modal-open');
 }
 
 export function closeModal(modal) {
@@ -492,6 +580,8 @@ export function closeModal(modal) {
   } catch {
     // ignore
   }
+  const anyOpen = !!document.querySelector('.modal:not(.hidden)');
+  if (!anyOpen) document.body?.classList.remove('modal-open');
 }
 
 function getTrophyNextCost(basePrice, nextLevel) {

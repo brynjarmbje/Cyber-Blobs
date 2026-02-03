@@ -2,7 +2,7 @@
 /* Simple service worker for offline caching.
    Note: Service workers require a secure context (https or localhost). */
 
-const CACHE_NAME = 'leikur-cache-v150';
+const CACHE_NAME = 'leikur-cache-v181';
 
 // Keep this list small + stable; cache-first for static assets.
 const PRECACHE_URLS = [
@@ -27,6 +27,15 @@ const PRECACHE_URLS = [
   './assets/yolk_target_frame.png',
   './assets/yolk_target_frame_border.png',
   './assets/yolk-frame_transp_cyber.png',
+  './assets/level_frame_cyber.png',
+  './assets/crystals_frame_cyber.png',
+  './assets/energy_frame_cyber.png',
+  './assets/lives_cyber.png',
+  './assets/left_analog_cyber.png',
+  './assets/right_analog_cyber.png',
+  './assets/pause_button_cyber.png',
+  './assets/laser_button_cyber.png',
+  './assets/nuke_button_cyber.jpg',
   './assets/menu-hero.png',
   './assets/asteroid-crystal-reactor.png',
   './CyberBlob-Theme_V1.mp3',
@@ -108,19 +117,35 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets: cache-first.
+  // Static assets: stale-while-revalidate.
+  // Return cached quickly, but also fetch in the background to keep assets fresh.
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(req);
-      if (cached) return cached;
 
-      const fresh = await fetch(req);
-      // Only cache successful basic responses.
-      if (fresh && fresh.ok && fresh.type === 'basic') {
-        cache.put(req, fresh.clone());
+      const fetchAndUpdate = async () => {
+        try {
+          const fresh = await fetch(req);
+          // Only cache successful basic responses.
+          if (fresh && fresh.ok && fresh.type === 'basic') {
+            await cache.put(req, fresh.clone());
+          }
+          return fresh;
+        } catch {
+          return null;
+        }
+      };
+
+      if (cached) {
+        // Update in background; don't block the response.
+        event.waitUntil(fetchAndUpdate());
+        return cached;
       }
-      return fresh;
+
+      const fresh = await fetchAndUpdate();
+      // If network fails and there's no cache (should be rare), fall back to a generic response.
+      return fresh || new Response('', { status: 503, statusText: 'Offline' });
     })()
   );
 });
