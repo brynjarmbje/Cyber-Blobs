@@ -43,6 +43,8 @@
   "protocolHandlers": [],
   "fileHandlers": [],
   "launchHandlerClientMode": "",
-  "displayOverride": [],
+  "displayOverride": [
+    "standalone"
+  ],
   "appVersion": "1"
 }
