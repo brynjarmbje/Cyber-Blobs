@@ -325,19 +325,23 @@ export function updateHud(ui, state) {
   lastUiCash = cashNum;
 
   if (typeof laserText === 'string') {
-    setUltButtonLabel(ui.ultBtn, laserText);
-    setUltButtonLabel(ui.laserTopBtn, laserText);
+    const laserCooldown = Number(laserCooldownSeconds) || 0;
+    const laserLabel = laserCooldown > 0 && !laserActive ? `LASER\n${laserCooldown}s` : laserText;
+    setUltButtonLabel(ui.ultBtn, laserLabel);
+    setUltButtonLabel(ui.laserTopBtn, laserLabel);
   }
   if (typeof nukeText === 'string') {
-    setUltButtonLabel(ui.nukeBtn, nukeText);
-    setUltButtonLabel(ui.nukeTopBtn, nukeText);
+    const nukeCooldown = Number(nukeCooldownSeconds) || 0;
+    const nukeLabel = nukeCooldown > 0 && !nukeActive ? `NUKE\n${nukeCooldown}s` : nukeText;
+    setUltButtonLabel(ui.nukeBtn, nukeLabel);
+    setUltButtonLabel(ui.nukeTopBtn, nukeLabel);
   }
 
   // Make ult buttons visually obvious when ready.
-  setUltButtonState(ui.ultBtn, { ready: !!laserReady, active: !!laserActive });
-  setUltButtonState(ui.laserTopBtn, { ready: !!laserReady, active: !!laserActive });
-  setUltButtonState(ui.nukeBtn, { ready: !!nukeReady, active: !!nukeActive });
-  setUltButtonState(ui.nukeTopBtn, { ready: !!nukeReady, active: !!nukeActive });
+  setUltButtonState(ui.ultBtn, { ready: !!laserReady, active: !!laserActive, cooldownSeconds: Number(laserCooldownSeconds) || 0 });
+  setUltButtonState(ui.laserTopBtn, { ready: !!laserReady, active: !!laserActive, cooldownSeconds: Number(laserCooldownSeconds) || 0 });
+  setUltButtonState(ui.nukeBtn, { ready: !!nukeReady, active: !!nukeActive, cooldownSeconds: Number(nukeCooldownSeconds) || 0 });
+  setUltButtonState(ui.nukeTopBtn, { ready: !!nukeReady, active: !!nukeActive, cooldownSeconds: Number(nukeCooldownSeconds) || 0 });
 
   // Desktop hint bar: show ult status + aim mode toggle.
   syncAimModeHint(ui, { mouseAimEnabled: !!mouseAimEnabled });
@@ -483,10 +487,12 @@ function syncUltStatusHint(
     });
 }
 
-function setUltButtonState(buttonEl, { ready, active }) {
+function setUltButtonState(buttonEl, { ready, active, cooldownSeconds }) {
   if (!buttonEl) return;
   buttonEl.classList.toggle('isReady', !!ready);
   buttonEl.classList.toggle('isActive', !!active);
+  const onCooldown = !active && Number(cooldownSeconds) > 0;
+  buttonEl.classList.toggle('isCooldown', onCooldown);
 }
 
 function setUltButtonLabel(buttonEl, text) {

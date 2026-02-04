@@ -97,6 +97,24 @@
     #laserTopBtn:focus-visible,
     #nukeTopBtn:focus-visible { outline: 2px solid rgba(0,255,255,0.45); outline-offset: 3px; }
 
+    /* Cooldown state: gray + subdued */
+    #laserTopBtn.isCooldown,
+    #nukeTopBtn.isCooldown,
+    #ultBtn.isCooldown,
+    #nukeBtn.isCooldown {
+      filter: grayscale(1) brightness(0.78) saturate(0.2);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.28);
+    }
+
+    #laserTopBtn.isCooldown .ultKey,
+    #nukeTopBtn.isCooldown .ultKey,
+    #ultBtn.isCooldown .ultKey,
+    #nukeBtn.isCooldown .ultKey {
+      background: rgba(0,0,0,0.65);
+      color: #d6d6d6;
+      text-shadow: none;
+    }
+
     /* Default hidden until owned */
     #laserTopBtn.hidden,
     #nukeTopBtn.hidden,
