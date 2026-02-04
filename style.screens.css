@@ -104,38 +104,46 @@
 
     /* Center toast used for powerup pickup callouts */
     #centerToast {
+      --toastAccent: #eaffff;
+      --toastGlow: rgba(0,255,255,0.45);
       position: absolute;
       left: 50%;
       top: 50%;
       transform: translate(-50%, -50%);
       font-size: 2.1rem;
       font-weight: 900;
-      color: #eaffff;
-      text-shadow: 0 0 10px rgba(0,255,255,0.55), 0 0 22px rgba(0,255,255,0.28);
+      font-family: "Rajdhani", "Orbitron", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--toastAccent);
+      text-shadow: 0 0 16px var(--toastGlow), 0 0 32px var(--toastGlow);
       opacity: 0;
       transition: opacity 0.35s ease;
       pointer-events: none;
       user-select: none;
-      letter-spacing: 0.8px;
     }
 
     #centerToast.visible { opacity: 1; }
 
     /* Rift toast (slightly above the powerup toast) */
     #riftToast {
+      --toastAccent: rgba(234,255,255,0.95);
+      --toastGlow: rgba(0,255,255,0.40);
       position: absolute;
       left: 50%;
       top: 36%;
       transform: translate(-50%, -50%);
       font-size: 1.75rem;
       font-weight: 950;
-      color: rgba(234,255,255,0.95);
-      text-shadow: 0 0 10px rgba(0,255,255,0.55), 0 0 22px rgba(0,255,255,0.22);
+      font-family: "Rajdhani", "Orbitron", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--toastAccent);
+      text-shadow: 0 0 14px var(--toastGlow), 0 0 28px var(--toastGlow);
       opacity: 0;
       transition: opacity 0.35s ease;
       pointer-events: none;
       user-select: none;
-      letter-spacing: 0.6px;
       z-index: 60;
       text-align: center;
     }
@@ -956,6 +964,10 @@
     border-radius: 14px;
     padding: 14px 12px;
     min-height: 54px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
     font-weight: 900;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -970,6 +982,57 @@
       0 0 0 1px rgba(0,0,0,0.4) inset;
     cursor: pointer;
     transition: transform 120ms ease, filter 140ms ease, box-shadow 140ms ease;
+  }
+
+  .levelBtnLabel {
+    font-weight: 900;
+    letter-spacing: 0.08em;
+  }
+
+  .levelBtnIcons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .progressIcon {
+    width: 16px;
+    height: 16px;
+    border-radius: 6px;
+    border: 1px solid rgba(255,255,255,0.25);
+    background: rgba(0,0,0,0.35);
+    box-shadow: 0 0 12px rgba(0,0,0,0.25);
+  }
+
+  .progressIcon--blueprint {
+    border-radius: 4px;
+    background:
+      linear-gradient(135deg, rgba(90, 220, 255, 0.55), rgba(120, 120, 255, 0.35)),
+      rgba(0,0,0,0.35);
+    border: 1px solid rgba(140, 220, 255, 0.55);
+    box-shadow: 0 0 16px rgba(90, 220, 255, 0.25);
+    position: relative;
+  }
+  .progressIcon--blueprint::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 1px dashed rgba(220, 245, 255, 0.6);
+    border-radius: 2px;
+    opacity: 0.9;
+  }
+
+  .progressIcon--egg {
+    border-radius: 999px;
+    background: rgba(0,0,0,0.25);
+    border: 1px dashed rgba(255,255,255,0.35);
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+  }
+  .progressIcon--egg.is-installed {
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.95) 0 18%, rgba(255,255,255,0.3) 32%, rgba(0,0,0,0) 60%),
+      var(--eggColor, #66ccff);
+    border: 1px solid color-mix(in srgb, var(--eggColor, #66ccff) 75%, rgba(255,255,255,0.6));
+    box-shadow: 0 0 14px color-mix(in srgb, var(--eggColor, #66ccff) 65%, rgba(0,0,0,0.0));
   }
   .levelBtn:hover {
     filter: brightness(1.05) saturate(1.05);
@@ -1410,12 +1473,18 @@
   
   /* "LEVEL UP!" message in the center of the canvas container */
   #levelUpMessage {
+    --toastAccent: #6dffb6;
+    --toastGlow: rgba(80, 255, 180, 0.55);
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
     font-size: 3rem;
-    color: #0ff;
-    text-shadow: 0 0 10px #0ff, 0 0 20px #0ff;
+    font-weight: 900;
+    font-family: "Rajdhani", "Orbitron", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--toastAccent);
+    text-shadow: 0 0 18px var(--toastGlow), 0 0 36px var(--toastGlow);
     white-space: nowrap;
     max-width: min(92vw, 720px);
     text-align: center;

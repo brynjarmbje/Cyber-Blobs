@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { COLOR_ORDER } from '../shared/constants.js';
+
 /**
  * Menu/UI helpers and bindings extracted from game.js to keep gameplay logic focused.
  */
@@ -13,7 +15,13 @@ export function syncMainMenuUi(ui, { loadPlayerName } = {}) {
 
 export function openLevelSelectModal(
   ui,
-  { openModal, maxStartLevelUnlocked = 0, startRunFromLevel, allowBackToMenu = true } = {}
+  {
+    openModal,
+    maxStartLevelUnlocked = 0,
+    startRunFromLevel,
+    allowBackToMenu = true,
+    storyProgress,
+  } = {}
 ) {
   if (!ui?.levelSelectModal || !ui?.levelSelectGrid) {
     if (typeof startRunFromLevel === 'function') startRunFromLevel(1);
@@ -22,12 +30,67 @@ export function openLevelSelectModal(
 
   ui.levelSelectGrid.textContent = '';
 
+  const COLOR_TO_ACCENT = {
+    yellow: '#ffd54a',
+    red: '#ff4d6d',
+    green: '#38ffb3',
+    blue: '#4fa8ff',
+    black: '#cfd6e5',
+    white: '#f5f8ff',
+    purple: '#b56cff',
+    brown: '#c08a5a',
+    pink: '#ff6adf',
+  };
+
+  const normalizeColorSet = (value) => {
+    const out = new Set();
+    if (!value) return out;
+    if (value instanceof Set) {
+      for (const v of value) if (COLOR_ORDER.includes(v)) out.add(v);
+      return out;
+    }
+    if (Array.isArray(value)) {
+      for (const v of value) if (COLOR_ORDER.includes(v)) out.add(v);
+    }
+    return out;
+  };
+
+  const blueprints = normalizeColorSet(storyProgress?.blueprints);
+  const eggsInstalled = normalizeColorSet(storyProgress?.eggsInstalled);
+  const hasBlueprints = blueprints.size > 0;
+
   const mkBtn = (lv) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'levelBtn';
     b.dataset.startLevel = String(lv);
-    b.textContent = `Level ${lv}`;
+    const label = document.createElement('span');
+    label.className = 'levelBtnLabel';
+    label.textContent = `Level ${lv}`;
+    b.appendChild(label);
+
+    if (hasBlueprints) {
+      const icons = document.createElement('div');
+      icons.className = 'levelBtnIcons';
+
+      const blueprint = document.createElement('span');
+      blueprint.className = 'progressIcon progressIcon--blueprint';
+      blueprint.title = 'Blueprints found';
+      icons.appendChild(blueprint);
+
+      for (const color of COLOR_ORDER) {
+        if (!blueprints.has(color)) continue;
+        const egg = document.createElement('span');
+        egg.className = 'progressIcon progressIcon--egg';
+        if (eggsInstalled.has(color)) egg.classList.add('is-installed');
+        egg.style.setProperty('--eggColor', COLOR_TO_ACCENT[color] || '#66ccff');
+        egg.title = `${color} egg`;
+        icons.appendChild(egg);
+      }
+
+      if (icons.childElementCount > 0) b.appendChild(icons);
+    }
+
     return b;
   };
 

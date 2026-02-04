@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
   mouseAim: 'cs_mouse_aim_v1',
   maxStartLevel: 'cs_max_start_level_v1',
   playerName: 'cs_player_name_v1',
+  storyProgress: 'cs_story_progress_v1',
 };
 
 export const COLOR_CASH_VALUES = {

@@ -239,9 +239,10 @@ export function updateHud(ui, state) {
     mouseAimEnabled,
   } = state;
 
+  const levelNum = Number.isFinite(Number(level)) ? Math.max(0, Math.floor(Number(level))) : 0;
   const livesNum = Number.isFinite(Number(lives)) ? Math.max(0, Math.floor(Number(lives))) : 0;
 
-  if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(level);
+  if (ui.hudLevelEl) ui.hudLevelEl.textContent = String(levelNum);
   if (ui.hudTimeEl) ui.hudTimeEl.textContent = String(Math.max(0, Math.floor(elapsedSeconds)));
   if (ui.hudEnergyEl) {
     const ep = clampPercent(energyPercent);
@@ -279,8 +280,16 @@ export function updateHud(ui, state) {
     ui.igEnergyWidgetEl.style.setProperty('--p', String(ep / 100));
     ui.igEnergyWidgetEl.style.setProperty('--accent', energyAccent(ep));
     ui.igEnergyWidgetEl.style.setProperty('--accentGlow', energyAccentGlow(ep));
+    ui.igEnergyWidgetEl.classList.toggle('energyCritical', ep <= 20);
     if (ui.igEnergyPctEl) ui.igEnergyPctEl.textContent = `${ep}%`;
   }
+
+  // Level-up pulse on the level pill.
+  if (levelNum > 0 && lastUiLevel !== null && levelNum > lastUiLevel) {
+    const levelPillEl = ui.hudLevelEl?.closest('.igStat--level');
+    if (levelPillEl) pulseHudPill(levelPillEl, 'igLevelUpPulse');
+  }
+  lastUiLevel = levelNum;
 
   // If we render the nicer target preview in-game, mirror it into the top bar swatch.
   syncTargetSwatches(ui);
@@ -290,6 +299,12 @@ export function updateHud(ui, state) {
   renderLives(ui.livesContainerEl, livesNum);
   if (ui.livesContainerEl) ui.livesContainerEl.dataset.livesCount = String(livesNum);
 
+  // Extra-life pulse on the lives pill.
+  if (lastUiLives !== null && livesNum > lastUiLives && ui.livesOverlay) {
+    pulseHudPill(ui.livesOverlay, 'igLifeGainPulse');
+  }
+  lastUiLives = livesNum;
+
   if (ui.activeOverlayEl) {
     const now = typeof nowMs === 'number' ? nowMs : performance.now();
     renderActivePowerUps(ui.activeOverlayEl, activePowerUps, now);
@@ -298,6 +313,16 @@ export function updateHud(ui, state) {
   const cashHudText = formatCashForHud(cash);
   if (ui.cashEl) ui.cashEl.textContent = cashHudText;
   if (ui.scorePillValue) ui.scorePillValue.textContent = cashHudText;
+
+  const cashNum = Number.isFinite(Number(cash)) ? Number(cash) : 0;
+  if (lastUiCash !== null && cashNum > lastUiCash) {
+    const cashPillEl = ui.cashEl?.closest('.igStat--cash');
+    if (cashPillEl) {
+      pulseHudPill(cashPillEl, 'igCashGainPulse');
+      spawnCashBurst(cashPillEl, cashNum - lastUiCash);
+    }
+  }
+  lastUiCash = cashNum;
 
   if (typeof laserText === 'string') {
     setUltButtonLabel(ui.ultBtn, laserText);
@@ -329,6 +354,31 @@ export function updateHud(ui, state) {
 }
 
 let lastUiNextColor = null;
+let lastUiLevel = null;
+let lastUiLives = null;
+let lastUiCash = null;
+
+function pulseHudPill(el, className) {
+  if (!el) return;
+  el.classList.remove(className);
+  // Force reflow to restart animation.
+  void el.offsetWidth;
+  el.classList.add(className);
+  const remove = () => el.classList.remove(className);
+  el.addEventListener('animationend', remove, { once: true });
+  el.addEventListener('animationcancel', remove, { once: true });
+}
+
+function spawnCashBurst(containerEl, delta) {
+  if (!containerEl || !Number.isFinite(delta) || delta <= 0) return;
+  const el = document.createElement('span');
+  el.className = 'igCashBurst';
+  el.textContent = `+${formatCashForHud(delta)}`;
+  containerEl.appendChild(el);
+  const remove = () => el.remove();
+  el.addEventListener('animationend', remove, { once: true });
+  el.addEventListener('animationcancel', remove, { once: true });
+}
 
 function colorNameToAccent(name) {
   const k = typeof name === 'string' ? name.toLowerCase() : '';
@@ -483,9 +533,13 @@ export function showLevelUpMessage(levelUpMessage) {
   showCenterMessage(levelUpMessage, 'LEVEL UP!', 1500);
 }
 
-export function showCenterMessage(levelUpMessage, text, durationMs = 1200) {
+export function showCenterMessage(levelUpMessage, text, durationMs = 1200, options = {}) {
   if (!levelUpMessage) return;
   levelUpMessage.textContent = text;
+  if (options.accent) levelUpMessage.style.setProperty('--toastAccent', options.accent);
+  else levelUpMessage.style.removeProperty('--toastAccent');
+  if (options.glow) levelUpMessage.style.setProperty('--toastGlow', options.glow);
+  else levelUpMessage.style.removeProperty('--toastGlow');
   levelUpMessage.classList.remove('visible');
   // force reflow
   void levelUpMessage.offsetWidth;

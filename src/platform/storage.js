@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { STORAGE_KEYS } from '../shared/constants.js';
+import { COLOR_ORDER, STORAGE_KEYS } from '../shared/constants.js';
 
 function safeParseJson(value, fallback) {
   if (typeof value !== 'string' || value.length === 0) return fallback;
@@ -229,4 +229,54 @@ export function savePlayerName(name) {
     return;
   }
   localStorage.setItem(STORAGE_KEYS.playerName, v);
+}
+
+function normalizeStoryColorSet(value) {
+  const out = new Set();
+  if (value instanceof Set) {
+    for (const raw of value) {
+      if (typeof raw !== 'string') continue;
+      if (COLOR_ORDER.includes(raw)) out.add(raw);
+    }
+    return out;
+  }
+  if (Array.isArray(value)) {
+    for (const raw of value) {
+      if (typeof raw !== 'string') continue;
+      if (COLOR_ORDER.includes(raw)) out.add(raw);
+    }
+    return out;
+  }
+  if (value && typeof value === 'object') {
+    for (const key of Object.keys(value)) {
+      if (COLOR_ORDER.includes(key)) out.add(key);
+    }
+  }
+  return out;
+}
+
+function normalizeStoryProgress(raw) {
+  if (!raw || typeof raw !== 'object') {
+    return { blueprints: new Set(), eggsInstalled: new Set() };
+  }
+  return {
+    blueprints: normalizeStoryColorSet(raw.blueprints),
+    eggsInstalled: normalizeStoryColorSet(raw.eggsInstalled),
+  };
+}
+
+export function loadStoryProgress() {
+  const raw = safeParseJson(localStorage.getItem(STORAGE_KEYS.storyProgress), null);
+  return normalizeStoryProgress(raw);
+}
+
+export function saveStoryProgress(progress) {
+  const normalized = normalizeStoryProgress(progress);
+  localStorage.setItem(
+    STORAGE_KEYS.storyProgress,
+    JSON.stringify({
+      blueprints: Array.from(normalized.blueprints),
+      eggsInstalled: Array.from(normalized.eggsInstalled),
+    })
+  );
 }

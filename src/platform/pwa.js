@@ -9,7 +9,12 @@ export function registerServiceWorker() {
     location.hostname === '127.0.0.1' ||
     location.hostname === '[::1]';
 
-  if (location.protocol !== 'https:' && !isLocalhost) {
+  if (isLocalhost) {
+    // Skip SW on localhost to avoid stale caches during dev.
+    return;
+  }
+
+  if (location.protocol !== 'https:') {
     // Don't spam console; just skip registration.
     return;
   }

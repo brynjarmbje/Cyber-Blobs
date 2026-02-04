@@ -22,6 +22,7 @@ import {
   loadUltimateUpgrades,
   loadMouseAimEnabled,
   loadMaxStartLevel,
+  loadStoryProgress,
   saveCash,
   saveMouseAimEnabled,
   saveMaxStartLevel,
@@ -29,6 +30,7 @@ import {
   saveOwnedTrophies,
   saveTrophyLevels,
   savePlayerName,
+  saveStoryProgress,
   saveUltimateType,
   saveUltimateUpgrades,
 } from '../platform/storage.js';
@@ -98,6 +100,9 @@ export function createGame(ui) {
   let achievements = loadAchievements();
   let ownedUltimates = loadOwnedUltimates();
   let ultimateUpgrades = loadUltimateUpgrades();
+  let storyProgress = loadStoryProgress();
+  let eggBlueprints = storyProgress.blueprints || new Set();
+  let eggArtifactsInstalled = storyProgress.eggsInstalled || new Set();
 
   function computeTrophyEffects() {
     const effects = {
@@ -147,7 +152,7 @@ export function createGame(ui) {
   let startCountdownActive = false;
   let startCountdownToken = 0;
 
-  // Checkpoint starts (unlock every 10 levels reached)
+  // Checkpoint starts (unlock every 5 levels reached)
   let maxStartLevelUnlocked = loadMaxStartLevel();
   let nextRunStartLevel = 1;
 
@@ -202,6 +207,7 @@ export function createGame(ui) {
       maxStartLevelUnlocked,
       startRunFromLevel,
       allowBackToMenu,
+      storyProgress: { blueprints: eggBlueprints, eggsInstalled: eggArtifactsInstalled },
     });
   }
 
@@ -244,8 +250,8 @@ export function createGame(ui) {
   }
 
   function checkpointForLevel(lv) {
-    const n = Math.floor(lv / 10) * 10;
-    return n >= 10 ? n : 0;
+    const n = Math.floor(lv / 5) * 5;
+    return n >= 5 ? n : 0;
   }
 
   function maybeUnlockCheckpoint(lv) {
@@ -254,6 +260,76 @@ export function createGame(ui) {
       maxStartLevelUnlocked = cp;
       saveMaxStartLevel(maxStartLevelUnlocked);
     }
+    saveStoryProgress({ blueprints: eggBlueprints, eggsInstalled: eggArtifactsInstalled });
+  }
+
+  function getEggAccentColor(color) {
+    if (color === 'yellow') return '#ffd54a';
+    if (color === 'red') return '#ff4d6d';
+    if (color === 'green') return '#38ffb3';
+    if (color === 'blue') return '#4fa8ff';
+    if (color === 'black') return '#cfd6e5';
+    if (color === 'white') return '#f5f8ff';
+    if (color === 'purple') return '#b56cff';
+    if (color === 'brown') return '#c08a5a';
+    if (color === 'pink') return '#ff6adf';
+    return '#66ccff';
+  }
+
+  function getNextMissingBlueprintColor() {
+    for (const color of COLOR_ORDER) {
+      if (!eggBlueprints.has(color)) return color;
+    }
+    return null;
+  }
+
+  function installEggArtifact(color, x, y) {
+    if (!color || eggArtifactsInstalled.has(color)) return;
+    eggArtifactsInstalled.add(color);
+    saveStoryProgress({ blueprints: eggBlueprints, eggsInstalled: eggArtifactsInstalled });
+
+    const accent = getEggAccentColor(color);
+    showCenterMessage(ui.centerToast, `EGG INSTALLED — ${String(color).toUpperCase()}`, 1100, {
+      accent,
+      glow: accentToGlow(accent, 0.55),
+    });
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      spawnCircleBurst(x, y, colorToRGBA(color, 0.78), 10, 26);
+    }
+  }
+
+  function maybeDropEggArtifact(color, x, y) {
+    if (inBonusRoom) return;
+    if (!color) return;
+    if (!eggBlueprints.has(color)) return;
+    if (eggArtifactsInstalled.has(color)) return;
+    if (Math.random() < EGG_DROP_CHANCE) {
+      installEggArtifact(color, x, y);
+    }
+  }
+
+  function tryClaimRiftBlueprint() {
+    if (!inBonusRoom || !riftAltar || altarClaimedThisVisit) return;
+    const dx = player.x - riftAltar.x;
+    const dy = player.y - riftAltar.y;
+    const rad = player.radius + riftAltar.radius + 4;
+    if (dx * dx + dy * dy > rad * rad) return;
+
+    altarClaimedThisVisit = true;
+    const nextColor = getNextMissingBlueprintColor();
+    if (!nextColor) {
+      showCenterMessage(ui.riftToast || ui.centerToast, 'ALTAR DORMANT', 900);
+      return;
+    }
+
+    eggBlueprints.add(nextColor);
+    saveStoryProgress({ blueprints: eggBlueprints, eggsInstalled: eggArtifactsInstalled });
+
+    const accent = getEggAccentColor(nextColor);
+    showCenterMessage(ui.riftToast || ui.centerToast, `BLUEPRINT — ${nextColor.toUpperCase()}`, 1200, {
+      accent,
+      glow: accentToGlow(accent, 0.6),
+    });
   }
 
   // Visual scale (boost sizes on small screens)
@@ -963,6 +1039,10 @@ export function createGame(ui) {
   let bonusNextSpawnAtMs = 0;
   let bonusForcedShotgun = false;
   let mainWorldSnapshot = null;
+  let riftAltar = null; // { x, y, radius }
+  let altarClaimedThisVisit = false;
+  const ALTAR_RADIUS = 26;
+  const EGG_DROP_CHANCE = 0.15;
 
   // Color order for this level
   let levelColors = [];
@@ -970,6 +1050,7 @@ export function createGame(ui) {
 
   // Level spawning (trickle)
   let levelSpawn = null;
+  let allowAllTargets = false;
 
   // Persist cash occasionally
   let cashDirty = false;
@@ -1238,8 +1319,24 @@ export function createGame(ui) {
 
   function isKillableEnemy(e) {
     if (inBonusRoom) return true;
+    if (allowAllTargets) return true;
     const nextTargetColor = levelColors[levelNextColorIndex];
     return !!nextTargetColor && e.color === nextTargetColor;
+  }
+
+  function updateKillableTargetOverride() {
+    if (inBonusRoom) {
+      allowAllTargets = true;
+      return;
+    }
+    const nextTargetColor = levelColors[levelNextColorIndex];
+    if (!nextTargetColor) {
+      allowAllTargets = true;
+      return;
+    }
+    const pendingForColor = levelSpawn?.pendingByColor?.[nextTargetColor] || 0;
+    const hasColorAlive = enemies.some((en) => en.color === nextTargetColor);
+    allowAllTargets = pendingForColor <= 0 && !hasColorAlive;
   }
 
   function randInt(min, max) {
@@ -1325,6 +1422,8 @@ export function createGame(ui) {
     map.w = bonusW;
     map.h = bonusH;
     currentMap = createBonusMap(map);
+    riftAltar = { x: map.w / 2, y: map.h / 2, radius: ALTAR_RADIUS * sizeScale };
+    altarClaimedThisVisit = false;
 
     enemies = [];
     bullets = [];
@@ -1349,6 +1448,8 @@ export function createGame(ui) {
     if (!mainWorldSnapshot) {
       inBonusRoom = false;
       bonusForcedShotgun = false;
+      riftAltar = null;
+      altarClaimedThisVisit = false;
       return;
     }
 
@@ -1376,6 +1477,8 @@ export function createGame(ui) {
     bonusEndsAtMs = 0;
     bonusNextSpawnAtMs = 0;
     mainWorldSnapshot = null;
+    riftAltar = null;
+    altarClaimedThisVisit = false;
 
     showCenterMessage(ui.riftToast || ui.centerToast, 'RETURNED', 700);
   }
@@ -1399,6 +1502,7 @@ export function createGame(ui) {
     addCashForColor(e.color);
     enemies.splice(enemyIndex, 1);
     maybeSpawnPowerUp(e.x, e.y);
+    maybeDropEggArtifact(e.color, e.x, e.y);
     advanceNextColorIfCleared();
   }
 
@@ -1719,6 +1823,9 @@ export function createGame(ui) {
         prevY: y,
         vx: 0,
         vy: 0,
+        stuckMs: 0,
+        lastMoveCheckX: x,
+        lastMoveCheckY: y,
         radius,
         color,
         speed,
@@ -1942,7 +2049,11 @@ export function createGame(ui) {
   function activatePowerUp(type) {
     // Announce pickup (center toast + fly into active overlay)
     const label = String(type).toUpperCase();
-    showCenterMessage(ui.centerToast, label, 520);
+    const accent = powerupToastAccent(type);
+    showCenterMessage(ui.centerToast, label, 520, {
+      accent,
+      glow: accentToGlow(accent, 0.55),
+    });
     animatePickupToActive(ui, label);
 
     if (type === POWERUP_TYPES.life) {
@@ -1956,6 +2067,28 @@ export function createGame(ui) {
     const dur = POWERUP_DURATION_MS + trophyEffects.powerupDurationBonusMs + perTypeBonus;
     if (existing) existing.endTime = performance.now() + dur;
     else activePowerUps.push({ type, endTime: performance.now() + dur });
+  }
+
+  function powerupToastAccent(type) {
+    if (type === POWERUP_TYPES.speed) return '#ff9b3d';
+    if (type === POWERUP_TYPES.fireRate) return '#4fe8ff';
+    if (type === POWERUP_TYPES.piercing) return '#b56cff';
+    if (type === POWERUP_TYPES.shotgun) return '#ffd54a';
+    if (type === POWERUP_TYPES.bounce) return '#4fa8ff';
+    if (type === POWERUP_TYPES.stasis) return '#38ffb3';
+    if (type === POWERUP_TYPES.life) return '#ff4d6d';
+    return '#66ccff';
+  }
+
+  function accentToGlow(hex, alpha = 0.45) {
+    if (typeof hex !== 'string') return `rgba(102, 204, 255, ${alpha})`;
+    const h = hex.trim().replace('#', '');
+    if (h.length !== 6) return `rgba(102, 204, 255, ${alpha})`;
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return `rgba(102, 204, 255, ${alpha})`;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   }
 
   function updateActivePowerUps() {
@@ -2017,6 +2150,34 @@ export function createGame(ui) {
       spawnMuzzle(mx, my);
       bulletSfx.play();
     }
+  }
+
+  function drawRiftAltar(nowMs) {
+    if (!riftAltar) return;
+    const t = nowMs / 1000;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 2.3);
+    const r0 = riftAltar.radius * (0.92 + 0.12 * pulse);
+    const r1 = r0 * 1.55;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineWidth = 2.2 * sizeScale;
+    ctx.strokeStyle = `rgba(120, 210, 255, ${0.55 + 0.25 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(riftAltar.x, riftAltar.y, r0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 1.2 * sizeScale;
+    ctx.strokeStyle = `rgba(180, 245, 255, ${0.2 + 0.25 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(riftAltar.x, riftAltar.y, r1, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(80, 200, 255, ${0.12 + 0.08 * pulse})`;
+    ctx.beginPath();
+    ctx.arc(riftAltar.x, riftAltar.y, r0 * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   function draw() {
@@ -2083,6 +2244,10 @@ export function createGame(ui) {
     // Asteroids + crystal deposits (2D visual layer)
     if (USE_2D_ASTEROIDS) {
       drawAsteroids2D(nowMs);
+    }
+
+    if (inBonusRoom && riftAltar) {
+      drawRiftAltar(nowMs);
     }
 
     // Low-energy guidance: show an edge pointer towards the nearest crystal asteroid.
@@ -2349,6 +2514,8 @@ export function createGame(ui) {
     bonusNextSpawnAtMs = 0;
     mainWorldSnapshot = null;
     rift = null;
+    riftAltar = null;
+    altarClaimedThisVisit = false;
 
     paused = false;
     syncPauseUi();
@@ -2627,6 +2794,11 @@ export function createGame(ui) {
       }
     }
 
+    // Rift altar (blueprint claim)
+    if (inBonusRoom && riftAltar) {
+      tryClaimRiftBlueprint();
+    }
+
     // Auto shooting (time-based already)
     if (nowMs - lastShotTimeMs > shootDelayMs) {
       shootBullet();
@@ -2837,6 +3009,8 @@ export function createGame(ui) {
       }
     }
 
+        updateKillableTargetOverride();
+
     // Enemies chase + wobble + obstacle steering
     for (const e of enemies) {
       if (typeof e.prevX !== 'number') {
@@ -2844,6 +3018,9 @@ export function createGame(ui) {
         e.prevY = e.y;
         e.vx = 0;
         e.vy = 0;
+            e.stuckMs = 0;
+            e.lastMoveCheckX = e.x;
+            e.lastMoveCheckY = e.y;
       }
 
       const baseAngle = Math.atan2(player.y - e.y, player.x - e.x);
@@ -2897,6 +3074,34 @@ export function createGame(ui) {
       // If 3D renderer is active, the blob wobble is handled in shaders.
       // Skip the 2D blob update to save CPU at higher enemy counts.
       if (!renderer3d) updateEnemyBlob(e, nowMs);
+
+      if (typeof e.lastMoveCheckX !== 'number') {
+        e.lastMoveCheckX = e.x;
+        e.lastMoveCheckY = e.y;
+      }
+      if (typeof e.stuckMs !== 'number') e.stuckMs = 0;
+
+      const movedDist = Math.hypot(e.x - e.lastMoveCheckX, e.y - e.lastMoveCheckY);
+      if (movedDist < 0.12 * sizeScale) {
+        e.stuckMs += dtFrames * 16.67;
+      } else {
+        e.stuckMs = 0;
+        e.lastMoveCheckX = e.x;
+        e.lastMoveCheckY = e.y;
+      }
+
+      if (e.stuckMs > 2400) {
+        const spawn = getNonOverlappingSpawn(e.radius);
+        e.x = spawn.x;
+        e.y = spawn.y;
+        e.prevX = e.x;
+        e.prevY = e.y;
+        e.vx = 0;
+        e.vy = 0;
+        e.stuckMs = 0;
+        e.lastMoveCheckX = e.x;
+        e.lastMoveCheckY = e.y;
+      }
     }
 
     // Separate enemies is O(n^2). Throttle slightly when the screen is crowded.
